@@ -82,7 +82,7 @@ export default function HexagonsPage() {
   const scrollY = useScrollY();
 
   const isNarrow = width <= 1200;
-  const columns = isNarrow ? 5 : 6;
+  const columns = isNarrow ? 4 : 6;
   const denom = 1 + (columns - 1) * 0.75;
   // Make the grid slightly wider than the viewport so it clips symmetrically
   // when shifted by xOffset = -stepX/2 (same clip on left and right).
