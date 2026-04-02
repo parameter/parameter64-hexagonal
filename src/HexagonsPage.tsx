@@ -81,7 +81,8 @@ export default function HexagonsPage() {
   const { width, height } = useViewport();
   const scrollY = useScrollY();
 
-  const columns = 6;
+  const isNarrow = width <= 1200;
+  const columns = isNarrow ? 5 : 6;
   const denom = 1 + (columns - 1) * 0.75;
   // Make the grid slightly wider than the viewport so it clips symmetrically
   // when shifted by xOffset = -stepX/2 (same clip on left and right).
@@ -93,14 +94,14 @@ export default function HexagonsPage() {
   const totalScrollRows = Math.ceil((height * scrollScreens) / hexHeight) + 4;
   const contentHeight = totalScrollRows * hexHeight + hexHeight;
   const nearThreshold = hexHeight * 0.1;
-  const stepX = hexWidth * 0.75;
-  // Shift the whole grid by half a step so the outer columns are intentionally clipped.
-  const xOffset = -stepX / 2;
   const containerWidthPx = width;
+  // Keep clipping symmetric by centering the wider scene inside the viewport container.
+  const xOffset = (containerWidthPx - sceneWidth) / 2;
+  const containerLeftPx = (width - containerWidthPx) / 2;
 
   const cellContent = {
-    "2-2": "Hello",
-    "3-3": "World",
+    "2-1": "Hello",
+    "3-1": "World",
   };
 
   const scrollingCells = React.useMemo(
@@ -156,6 +157,7 @@ export default function HexagonsPage() {
       style={{
         position: "relative",
         width: containerWidthPx,
+        margin: "0 auto",
         minHeight: contentHeight,
         overflowX: "hidden",
         background:
@@ -219,7 +221,9 @@ export default function HexagonsPage() {
       <div
         style={{
           position: "fixed",
-          inset: 0,
+          top: 0,
+          left: containerLeftPx,
+          height: "100vh",
           pointerEvents: "none",
           width: containerWidthPx,
           overflow: "hidden",
