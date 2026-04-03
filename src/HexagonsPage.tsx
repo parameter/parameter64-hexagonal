@@ -11,10 +11,30 @@ type HexCell = {
   row: number;
   left: number;
   top: number;
-  hue: number;
+};
+
+/** Scrolling cell content: which fixed-cell key triggers overlap, and text to show when active. */
+type ScrollCellContentEntry = {
+  trigger: string;
+  content: string;
 };
 
 const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
+
+/** Base palette for default hex faces (cycled by col/row). */
+const HEX_CELL_BASE_SETTINGS = [
+  { id: "stone", hex: "#807D74" },
+  { id: "amber", hex: "#FFBF00" },
+  { id: "lime", hex: "#A4ED11" },
+] as const;
+
+function hexCellBaseGradient(hex: string) {
+  return `linear-gradient(160deg, color-mix(in srgb, ${hex} 88%, white 12%), color-mix(in srgb, ${hex} 72%, black 22%))`;
+}
+
+function hexCellBaseColorIndex(col: number, row: number) {
+  return (col + row * 2) % HEX_CELL_BASE_SETTINGS.length;
+}
 
 function useViewport(): Viewport {
   const [viewport, setViewport] = React.useState<Viewport>({
@@ -72,8 +92,7 @@ function buildCells(
     const row = Math.floor(index / columns);
     const left = col * hexWidth * 0.75 + xOffset;
     const top = row * hexHeight + (col % 2 ? hexHeight / 2 : 0);
-    const hue = 215 + ((row * 19 + col * 31) % 90);
-    return { index, col, row, left, top, hue };
+    return { index, col, row, left, top };
   });
 }
 
@@ -90,7 +109,7 @@ export default function HexagonsPage() {
   const hexWidth = sceneWidth / denom;
   const hexHeight = hexWidth * 0.8660254;
   const viewportRows = Math.ceil(height / hexHeight) + 2;
-  const scrollScreens = 7;
+  const scrollScreens = 1;
   const totalScrollRows = Math.ceil((height * scrollScreens) / hexHeight) + 4;
   const contentHeight = totalScrollRows * hexHeight + hexHeight;
   const nearThreshold = hexHeight * 0.1;
@@ -99,23 +118,59 @@ export default function HexagonsPage() {
   const xOffset = (containerWidthPx - sceneWidth) / 2;
   const containerLeftPx = (width - containerWidthPx) / 2;
 
-  const cellContent = {
-    "2-1": "Hello",
-    "3-1": "World",
+  const cellContent: Record<string, ScrollCellContentEntry> = {
+    "2-2": {
+      trigger: "1-1",
+      content: "Hello",
+    },
+    "3-12": {
+      trigger: "",
+      content: "World",
+    },
   };
+
+  const cellContentNarrow: Record<string, ScrollCellContentEntry> = {
+    "1-2": {
+      trigger: "1-1",
+      content: "Discgolf gamification react native mobile app",
+    },
+    "2-2": {
+      trigger: "2-2",
+      content: "World Narrow",
+    },
+    "1-4": {
+      trigger: "1-2",
+      content: "6666",
+    },
+    "2-5": {
+      trigger: "2-2",
+      content: "AzzzZZZZ",
+    },
+  };
+
+  const activeCellContent = isNarrow ? cellContentNarrow : cellContent;
 
   const scrollingCells = React.useMemo(
     () => buildCells(columns, totalScrollRows, hexWidth, hexHeight, xOffset),
     [columns, totalScrollRows, hexHeight, hexWidth, xOffset]
   );
 
-  const fixedCellContent = {
-    "1-0": "Hello",
-    "2-1": "World",
-    "3-0": "Foo",
-    "4-1": "Bar",
+  const fixedCellContent: Record<string, string> = {
+    "1-1": "Hello",
+    "2-2": "World",
+    "3-1": "Foo",
+    "4-2": "Bar",
   };
 
+  const fixedCellContentNarrow: Record<string, string> = {
+    "1-1": "Hello Narrow 2",
+    "2-2": "World Narrow 2",
+    "1-2": "Foo Narrow",
+    // "2-1": "Bar Narrow",
+  };
+
+  const activeFixedCellContent = isNarrow ? fixedCellContentNarrow : fixedCellContent;
+ 
   const fixedCells = React.useMemo(
     () => buildCells(columns, viewportRows, hexWidth, hexHeight, xOffset),
     [columns, viewportRows, hexHeight, hexWidth, xOffset]
@@ -127,30 +182,31 @@ export default function HexagonsPage() {
 
     for (const cell of scrollingCells) {
       const scrollKey = `${cell.col}-${cell.row}`;
-      const hasScrollContent = scrollKey in cellContent;
-      if (!hasScrollContent) continue;
+      const entry = activeCellContent[scrollKey];
+      if (!entry) continue;
 
-      const colOffset = cell.col % 2 ? hexHeight / 2 : 0;
+      const trigger = entry.trigger.trim();
+      if (!trigger) continue;
+
+      if (!(trigger in activeFixedCellContent)) continue;
+
+      const [fixedColStr, fixedRowStr] = trigger.split("-");
+      const fixedCol = Number(fixedColStr);
+      const fixedRow = Number(fixedRowStr);
+      if (!Number.isFinite(fixedCol) || !Number.isFinite(fixedRow)) continue;
+
+      const colOffset = fixedCol % 2 ? hexHeight / 2 : 0;
+      const fixedTop = fixedRow * hexHeight + colOffset;
       const screenTop = cell.top - scrollY;
+      const distance = Math.abs(screenTop - fixedTop);
+      if (distance > nearThreshold) continue;
 
-      for (const fixedKey of Object.keys(fixedCellContent)) {
-        const [fixedColStr, fixedRowStr] = fixedKey.split("-");
-        const fixedCol = Number(fixedColStr);
-        const fixedRow = Number(fixedRowStr);
-        if (!Number.isFinite(fixedCol) || !Number.isFinite(fixedRow)) continue;
-        if (fixedCol !== cell.col) continue;
-
-        const fixedTop = fixedRow * hexHeight + colOffset;
-        const distance = Math.abs(screenTop - fixedTop);
-        if (distance > nearThreshold) continue;
-
-        activeScrollKeys.add(scrollKey);
-        activeFixedKeys.add(fixedKey);
-      }
+      activeScrollKeys.add(scrollKey);
+      activeFixedKeys.add(trigger);
     }
 
     return { activeScrollKeys, activeFixedKeys };
-  }, [cellContent, fixedCellContent, hexHeight, nearThreshold, scrollY, scrollingCells]);
+  }, [activeCellContent, activeFixedCellContent, hexHeight, nearThreshold, scrollY, scrollingCells]);
 
   return (
     <div
@@ -164,11 +220,20 @@ export default function HexagonsPage() {
           "radial-gradient(1200px 800px at 15% 0%, rgba(34,211,238,0.17), transparent 58%), radial-gradient(1000px 800px at 100% 100%, rgba(168,85,247,0.20), transparent 62%), linear-gradient(180deg, #081021 0%, #0B132A 55%, #060B17 100%)",
       }}
     >
-      <div style={{ position: "absolute", inset: 0, width: containerWidthPx, overflow: "clip" }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          top: -hexHeight / 2,
+          width: containerWidthPx,
+          overflow: "clip",
+        }}
+      >
         {scrollingCells.map((cell) => {
-          const key = `${cell.col}-${cell.row}` as keyof typeof cellContent;
-          const content = cellContent[key];
-          const isActive = !!content && overlapState.activeScrollKeys.has(`${cell.col}-${cell.row}`);
+          const key = `${cell.col}-${cell.row}`;
+          const entry = activeCellContent[key];
+          const isActive = !!entry && overlapState.activeScrollKeys.has(key);
+          const baseHex = HEX_CELL_BASE_SETTINGS[hexCellBaseColorIndex(cell.col, cell.row)].hex;
 
           return (
             <div
@@ -183,7 +248,7 @@ export default function HexagonsPage() {
                 WebkitClipPath: HEX_CLIP,
                 background: isActive
                   ? "linear-gradient(160deg, rgba(255,248,180,0.84), rgba(255,171,38,0.92))"
-                  : `linear-gradient(160deg, hsl(${cell.hue} 62% 55% / 0.9), hsl(${cell.hue + 30} 72% 36% / 0.9))`,
+                  : hexCellBaseGradient(baseHex),
                 border: isActive ? "1px solid rgba(255,241,176,0.95)" : "1px solid rgba(255,255,255,0.18)",
                 boxShadow: isActive
                   ? "inset 0 0 28px rgba(255,255,255,0.30), 0 0 32px rgba(255,188,76,0.45)"
@@ -197,20 +262,19 @@ export default function HexagonsPage() {
                   "transform 180ms ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear",
               }}
             >
-              {content && isActive ? (
+              {entry && isActive ? (
                 <div
                   style={{
                     padding: "10px 12px",
-                    borderRadius: 12,
-                    background: "rgba(0,0,0,0.22)",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    color: "rgba(255,255,255,0.92)",
                     fontWeight: 650,
                     letterSpacing: -0.2,
                     backdropFilter: "blur(8px)",
+                    textAlign: "center",
+                    lineHeight: "1.2em",
+                    color: "#333",
                   }}
                 >
-                  {content}
+                  {entry.content}
                 </div>
               ) : null}
             </div>
@@ -221,7 +285,7 @@ export default function HexagonsPage() {
       <div
         style={{
           position: "fixed",
-          top: 0,
+          top: -hexHeight / 2,
           left: containerLeftPx,
           height: "100vh",
           pointerEvents: "none",
@@ -232,9 +296,23 @@ export default function HexagonsPage() {
         {fixedCells.map((cell) => {
           const key = `${cell.col}-${cell.row}`;
           const isActive = overlapState.activeFixedKeys.has(key);
+          const isFixedContentMarker = key in activeFixedCellContent;
+          const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
+          const baseHex = HEX_CELL_BASE_SETTINGS[hexCellBaseColorIndex(cell.col, cell.row)].hex;
+          const baseShadow = isActive
+            ? "inset 0 0 28px rgba(255,255,255,0.36), 0 0 36px rgba(255,188,76,0.45)"
+            : "inset 0 0 16px rgba(255,255,255,0.12)";
+          const markerRing =
+            isFixedContentMarker && !isActive
+              ? ", 0 0 0 2px rgba(0, 230, 180, 0.95), 0 0 14px rgba(0, 230, 180, 0.45)"
+              : isFixedContentMarker && isActive
+                ? ", 0 0 0 2px rgba(255, 80, 200, 0.95), 0 0 16px rgba(255, 80, 200, 0.5)"
+                : "";
           return (
             <div
               key={`fixed-${cell.index}`}
+              className={isFixedContentMarker ? "hex-fixed-cell-marker" : undefined}
+              data-fixed-marker={isFixedContentMarker ? key : undefined}
               style={{
                 position: "absolute",
                 left: cell.left,
@@ -245,11 +323,9 @@ export default function HexagonsPage() {
                 WebkitClipPath: HEX_CLIP,
                 background: isActive
                   ? "linear-gradient(160deg, rgba(255,248,180,0.74), rgba(255,171,38,0.84))"
-                  : "linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))",
+                  : hexCellBaseGradient(baseHex),
                 border: isActive ? "1px solid rgba(255,241,176,0.95)" : "1px solid rgba(255,255,255,0.24)",
-                boxShadow: isActive
-                  ? "inset 0 0 28px rgba(255,255,255,0.36), 0 0 36px rgba(255,188,76,0.45)"
-                  : "inset 0 0 16px rgba(255,255,255,0.12)",
+                boxShadow: baseShadow + markerRing,
                 display: "grid",
                 placeItems: "center",
                 transform: isActive ? "scale(1.2)" : "scale(1)",
@@ -258,7 +334,14 @@ export default function HexagonsPage() {
                 transition:
                   "transform 180ms ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear",
               }}
-            />
+            >
+              {isFixedContentMarker ? (
+                <span className="hex-fixed-cell-marker-label" title={`${key} — ${markerLabel}`}>
+                  <span className="hex-fixed-cell-marker-key">{key}</span>
+                  <span className="hex-fixed-cell-marker-text">{markerLabel}</span>
+                </span>
+              ) : null}
+            </div>
           );
         })}
       </div>
