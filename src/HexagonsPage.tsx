@@ -21,20 +21,69 @@ type ScrollCellContentEntry = {
 
 const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
 
-/** Base palette for default hex faces (cycled by col/row). */
-const HEX_CELL_BASE_SETTINGS = [
-  { id: "stone", hex: "#807D74" },
-  { id: "amber", hex: "#FFBF00" },
-  { id: "lime", hex: "#A4ED11" },
-] as const;
+/** Same shape as HEX_CLIP; viewBox 0 0 100 100 matches percentage polygon. */
+const HEX_SVG_POINTS = "25,0 75,0 100,50 75,100 25,100 0,50";
 
-function hexCellBaseGradient(hex: string) {
-  return `linear-gradient(160deg, color-mix(in srgb, ${hex} 88%, white 12%), color-mix(in srgb, ${hex} 72%, black 22%))`;
+function HexClipStroke({ width, color }: { width: number, color: string }) {
+  return (
+    <svg
+      aria-hidden
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        overflow: "visible",
+        pointerEvents: "none",
+      }}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
+      <polygon
+        points={HEX_SVG_POINTS}
+        fill="none"
+        stroke={color}
+        strokeWidth={width}
+        vectorEffect="nonScalingStroke"
+      />
+    </svg>
+  );
 }
 
-function hexCellBaseColorIndex(col: number, row: number) {
-  return (col + row * 2) % HEX_CELL_BASE_SETTINGS.length;
-}
+/** Inline-only styles for fixed-cell debug labels (no external CSS). */
+const FIXED_MARKER_LABEL: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+  padding: "0 6px",
+  maxWidth: "92%",
+  minWidth: 0,
+  pointerEvents: "none",
+  textAlign: "center",
+  lineHeight: 1.1,
+};
+
+const FIXED_MARKER_KEY: React.CSSProperties = {
+  fontSize: 25,
+  fontWeight: 700,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  letterSpacing: "0.02em",
+  color: "rgba(0, 230, 180, 0.98)",
+  textShadow: "0 0 6px rgba(0, 0, 0, 0.85), 0 1px 2px rgba(0, 0, 0, 0.9)",
+};
+
+const FIXED_MARKER_TEXT: React.CSSProperties = {
+  fontSize: 25,
+  fontWeight: 600,
+  color: "rgba(255, 255, 255, 0.92)",
+  textShadow: "0 0 6px rgba(0, 0, 0, 0.85), 0 1px 2px rgba(0, 0, 0, 0.9)",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  maxWidth: "100%",
+};
 
 function useViewport(): Viewport {
   const [viewport, setViewport] = React.useState<Viewport>({
@@ -132,7 +181,7 @@ export default function HexagonsPage() {
   const cellContentNarrow: Record<string, ScrollCellContentEntry> = {
     "1-2": {
       trigger: "1-1",
-      content: "Discgolf gamification react native mobile app",
+      content: "Discgolf gamification react native mobile app, making the game more fun and engaging, see how you stack up against players around the world.",
     },
     "2-2": {
       trigger: "2-2",
@@ -233,50 +282,66 @@ export default function HexagonsPage() {
           const key = `${cell.col}-${cell.row}`;
           const entry = activeCellContent[key];
           const isActive = !!entry && overlapState.activeScrollKeys.has(key);
-          const baseHex = HEX_CELL_BASE_SETTINGS[hexCellBaseColorIndex(cell.col, cell.row)].hex;
 
           return (
             <div
               key={`scroll-${cell.index}`}
+              className="scroll-cell"
               style={{
                 position: "absolute",
                 left: cell.left,
                 top: cell.top,
                 width: hexWidth,
                 height: hexHeight,
-                clipPath: HEX_CLIP,
-                WebkitClipPath: HEX_CLIP,
-                background: isActive
-                  ? "linear-gradient(160deg, rgba(255,248,180,0.84), rgba(255,171,38,0.92))"
-                  : hexCellBaseGradient(baseHex),
-                border: isActive ? "1px solid rgba(255,241,176,0.95)" : "1px solid rgba(255,255,255,0.18)",
-                boxShadow: isActive
-                  ? "inset 0 0 28px rgba(255,255,255,0.30), 0 0 32px rgba(255,188,76,0.45)"
-                  : "inset 0 0 20px rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.30)",
-                display: "grid",
-                placeItems: "center",
                 transform: isActive ? "scale(1.35)" : "scale(1)",
                 transformOrigin: "center",
                 zIndex: isActive ? 2 : 1,
-                transition:
-                  "transform 180ms ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear",
               }}
             >
-              {entry && isActive ? (
+              <HexClipStroke
+                width={1}
+                color={isActive ? "rgba(255,241,176,0.95)" : "rgba(255,255,255,0.18)"}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  clipPath: HEX_CLIP,
+                  WebkitClipPath: HEX_CLIP,
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
                 <div
+                  aria-hidden
                   style={{
-                    padding: "10px 12px",
-                    fontWeight: 650,
-                    letterSpacing: -0.2,
-                    backdropFilter: "blur(8px)",
-                    textAlign: "center",
-                    lineHeight: "1.2em",
-                    color: "#333",
+                    position: "absolute",
+                    inset: 0,
+                    clipPath: HEX_CLIP,
+                    WebkitClipPath: HEX_CLIP,
+                    background:
+                      "linear-gradient(160deg, rgba(255,248,180,1), rgba(255,171,38,1))",
+                    opacity: isActive ? 1 : 0,
+                    transition: "opacity 0.6s ease",
+                    pointerEvents: "none",
                   }}
-                >
-                  {entry.content}
-                </div>
-              ) : null}
+                />
+                {entry && isActive ? (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      fontWeight: 650,
+                      letterSpacing: -0.2,
+                      backdropFilter: "blur(8px)",
+                      textAlign: "center",
+                      lineHeight: "1.2em",
+                      color: "#333",
+                    }}
+                  >
+                    {entry.content}
+                  </div>
+                ) : null}
+              </div>
             </div>
           );
         })}
@@ -298,20 +363,9 @@ export default function HexagonsPage() {
           const isActive = overlapState.activeFixedKeys.has(key);
           const isFixedContentMarker = key in activeFixedCellContent;
           const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
-          const baseHex = HEX_CELL_BASE_SETTINGS[hexCellBaseColorIndex(cell.col, cell.row)].hex;
-          const baseShadow = isActive
-            ? "inset 0 0 28px rgba(255,255,255,0.36), 0 0 36px rgba(255,188,76,0.45)"
-            : "inset 0 0 16px rgba(255,255,255,0.12)";
-          const markerRing =
-            isFixedContentMarker && !isActive
-              ? ", 0 0 0 2px rgba(0, 230, 180, 0.95), 0 0 14px rgba(0, 230, 180, 0.45)"
-              : isFixedContentMarker && isActive
-                ? ", 0 0 0 2px rgba(255, 80, 200, 0.95), 0 0 16px rgba(255, 80, 200, 0.5)"
-                : "";
           return (
             <div
               key={`fixed-${cell.index}`}
-              className={isFixedContentMarker ? "hex-fixed-cell-marker" : undefined}
               data-fixed-marker={isFixedContentMarker ? key : undefined}
               style={{
                 position: "absolute",
@@ -319,28 +373,35 @@ export default function HexagonsPage() {
                 top: cell.top,
                 width: hexWidth,
                 height: hexHeight,
-                clipPath: HEX_CLIP,
-                WebkitClipPath: HEX_CLIP,
-                background: isActive
-                  ? "linear-gradient(160deg, rgba(255,248,180,0.74), rgba(255,171,38,0.84))"
-                  : hexCellBaseGradient(baseHex),
-                border: isActive ? "1px solid rgba(255,241,176,0.95)" : "1px solid rgba(255,255,255,0.24)",
-                boxShadow: baseShadow + markerRing,
-                display: "grid",
-                placeItems: "center",
                 transform: isActive ? "scale(1.2)" : "scale(1)",
                 transformOrigin: "center",
                 zIndex: isActive ? 2 : 1,
+                isolation: isFixedContentMarker ? "isolate" : undefined,
                 transition:
-                  "transform 180ms ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear",
+                  "transform 180ms ease, background 140ms linear, box-shadow 140ms linear",
               }}
             >
-              {isFixedContentMarker ? (
-                <span className="hex-fixed-cell-marker-label" title={`${key} — ${markerLabel}`}>
-                  <span className="hex-fixed-cell-marker-key">{key}</span>
-                  <span className="hex-fixed-cell-marker-text">{markerLabel}</span>
-                </span>
-              ) : null}
+              <HexClipStroke
+                width={2} 
+                color={isActive ? "rgba(255,241,176,0.95)" : "rgba(255,255,255,0.24)"}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  clipPath: HEX_CLIP,
+                  WebkitClipPath: HEX_CLIP,
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
+                {isFixedContentMarker ? (
+                  <span style={FIXED_MARKER_LABEL} title={`${key} — ${markerLabel}`}>
+                    <span style={FIXED_MARKER_KEY}>{key}</span>
+                    <span style={FIXED_MARKER_TEXT}>{markerLabel}</span>
+                  </span>
+                ) : null}
+              </div>
             </div>
           );
         })}
