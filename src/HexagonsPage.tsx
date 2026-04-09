@@ -181,7 +181,7 @@ export default function HexagonsPage() {
   const cellContentNarrow: Record<string, ScrollCellContentEntry> = {
     "1-2": {
       trigger: "1-1",
-      content: "Discgolf gamification react native mobile app, making the game more fun and engaging, see how you stack up against players around the world.",
+      content: <>Architecture <br />and backend for<br /> mobile app.</>,
     },
     "2-2": {
       trigger: "2-2",
@@ -265,8 +265,7 @@ export default function HexagonsPage() {
         margin: "0 auto",
         minHeight: contentHeight,
         overflowX: "hidden",
-        background:
-          "radial-gradient(1200px 800px at 15% 0%, rgba(34,211,238,0.17), transparent 58%), radial-gradient(1000px 800px at 100% 100%, rgba(168,85,247,0.20), transparent 62%), linear-gradient(180deg, #081021 0%, #0B132A 55%, #060B17 100%)",
+        background: "#37474F"
       }}
     >
       <div
