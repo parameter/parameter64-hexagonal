@@ -16,7 +16,7 @@ type HexCell = {
 /** Scrolling cell content: which fixed-cell key triggers overlap, and text to show when active. */
 type ScrollCellContentEntry = {
   trigger: string;
-  content: string;
+  content: React.ReactNode;
 };
 
 const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
