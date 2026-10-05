@@ -597,7 +597,7 @@ export default function HexagonsPage() {
                       }}
                     />
                   ) : null}
-                  {entry ? (
+                  {entry && (isActive) ? (
                     <h2
                       className="hex-headline"
                       style={{
