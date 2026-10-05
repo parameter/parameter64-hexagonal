@@ -40,7 +40,11 @@ h1 {
 }
 
 .scroll-cell {
-  transition: transform 0.6s ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear;
+  transition: transform 0.3s ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear;
+}
+
+.hex-headline img {
+  margin: 0 0 10px 0;
 }
 
 .logo {

@@ -1,0 +1,19 @@
+@font-face {
+  font-family: c64;
+  src: url(/fonts/C64/c64_pro-style.ttf);
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "monospace";
+  src: url(/fonts/monospace/nk57-monospace-cd-rg.ttf);
+  font-display: swap;
+}
+
+.c64-font {
+  font-family: c64;
+}
+
+.hex-headline {
+  font-family: "monospace", ui-monospace, monospace;
+}
