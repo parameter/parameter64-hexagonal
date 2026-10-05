@@ -64,7 +64,7 @@ function HexClipStroke({ width, color }: { width: number, color: string }) {
 
 function HexClip({ width, color }: { width: number, color: string }) {
   return (
-    <>
+    
       <polygon
         points={HEX_SVG_POINTS}
         fill="none"
@@ -72,7 +72,7 @@ function HexClip({ width, color }: { width: number, color: string }) {
         strokeWidth={width}
         vectorEffect="nonScalingStroke"
       />
-    </>
+    
   );
 }
 
@@ -597,7 +597,7 @@ export default function HexagonsPage() {
                       }}
                     />
                   ) : null}
-                  {entry && entry.content != null ? (
+                  {entry && (isActive || entry.inactiveContent != null) ? (
                     <h2
                       className="hex-headline"
                       style={{
