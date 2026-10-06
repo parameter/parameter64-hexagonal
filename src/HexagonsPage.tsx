@@ -1,6 +1,40 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import chainoutLogo from "./images/chainout-logo-4.svg";
 import bidstackerLogo from "./images/bidstacker.png";
+
+/** Set to false (or open console and run `window.__HEX_DEBUG = false`) to silence. */
+const HEX_DEBUG = true;
+
+declare global {
+  interface Window {
+    __HEX_DEBUG?: boolean;
+  }
+}
+
+function hexDebugEnabled() {
+  return typeof window !== "undefined"
+    ? (window.__HEX_DEBUG ?? HEX_DEBUG)
+    : HEX_DEBUG;
+}
+
+function hexLog(tag: string, payload?: Record<string, unknown>) {
+  if (!hexDebugEnabled()) return;
+  if (payload) {
+    console.log(`[hex:${tag}]`, payload);
+  } else {
+    console.log(`[hex:${tag}]`);
+  }
+}
+
+function hexWarn(tag: string, payload?: Record<string, unknown>) {
+  if (!hexDebugEnabled()) return;
+  if (payload) {
+    console.warn(`[hex:${tag}]`, payload);
+  } else {
+    console.warn(`[hex:${tag}]`);
+  }
+}
 
 type Viewport = {
   width: number;
@@ -81,7 +115,7 @@ function HexClip({ width, color }: { width: number, color: string }) {
         points={HEX_SVG_POINTS}
         fill="none"
         stroke={"#242424"}
-        strokeWidth={width}
+        strokeWidth={0}
         vectorEffect="nonScalingStroke"
       />
     </svg>
@@ -123,22 +157,70 @@ const FIXED_MARKER_TEXT: React.CSSProperties = {
   maxWidth: "100%",
 };
 
+/**
+ * Viewport size for layout/scroll geometry.
+ * Guards against height-only shrinks (mobile chrome, soft keyboard, docked
+ * DevTools) which would rebuild the hex section shorter and clamp scroll mid-gesture.
+ */
 function useViewport(): Viewport {
-  const [viewport, setViewport] = React.useState<Viewport>({
+  const [viewport, setViewport] = React.useState<Viewport>(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  const stableRef = React.useRef<Viewport>({
     width: window.innerWidth,
     height: window.innerHeight,
   });
 
   React.useEffect(() => {
-    const onResize = () => {
-      setViewport({
-        width: window.innerWidth,
-        height: window.innerHeight,
+    const applyResize = () => {
+      const nextWidth = window.innerWidth;
+      const nextHeight = window.innerHeight;
+      const prev = stableRef.current;
+      const widthChanged = Math.abs(nextWidth - prev.width) >= 1;
+      const heightDelta = nextHeight - prev.height;
+
+      // Height-only shrink: keep the larger layout height so scroll range / fixed
+      // grid math stay stable. Width changes (rotate, real window resize) resync.
+      if (!widthChanged && heightDelta < 0) {
+        hexWarn("viewport:guard-height-shrink", {
+          keptHeight: prev.height,
+          rawHeight: nextHeight,
+          delta: Math.round(heightDelta),
+          scrollY: Math.round(window.scrollY),
+          maxScrollY: document.documentElement.scrollHeight - window.innerHeight,
+        });
+        return;
+      }
+
+      // Ignore tiny height-only jitter (URL bar / browser chrome).
+      if (!widthChanged && Math.abs(heightDelta) > 0 && Math.abs(heightDelta) < 48) {
+        hexLog("viewport:guard-height-jitter", {
+          keptHeight: prev.height,
+          rawHeight: nextHeight,
+          delta: Math.round(heightDelta),
+        });
+        return;
+      }
+
+      const next: Viewport = {
+        width: nextWidth,
+        height: widthChanged ? nextHeight : Math.max(prev.height, nextHeight),
+      };
+
+      if (next.width === prev.width && next.height === prev.height) return;
+
+      stableRef.current = next;
+      setViewport(next);
+      hexLog("viewport:update", {
+        ...next,
+        rawHeight: nextHeight,
+        widthChanged,
       });
     };
 
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("resize", applyResize);
+    return () => window.removeEventListener("resize", applyResize);
   }, []);
 
   return viewport;
@@ -149,17 +231,96 @@ function useScrollY() {
 
   React.useEffect(() => {
     let raf = 0;
+    let lastNativeY = window.scrollY;
+    let lastStateY = window.scrollY;
+    let scrollEventCount = 0;
+    let rafSkipCount = 0;
+    let lastLogAt = 0;
+    let lastNativeChangeAt = performance.now();
+    let lastStateChangeAt = performance.now();
+
+    hexLog("scroll:listen", {
+      initialScrollY: window.scrollY,
+      maxScrollY: document.documentElement.scrollHeight - window.innerHeight,
+      bodyOverflow: getComputedStyle(document.body).overflow,
+      htmlOverflow: getComputedStyle(document.documentElement).overflow,
+    });
+
     const onScroll = () => {
-      if (raf) return;
+      scrollEventCount += 1;
+      const nativeY = window.scrollY;
+      const now = performance.now();
+
+      if (nativeY !== lastNativeY) {
+        lastNativeChangeAt = now;
+        lastNativeY = nativeY;
+      }
+
+      // Detect "scroll stuck": events may still fire (or wheel may fire) but Y doesn't move.
+      if (now - lastLogAt > 250) {
+        lastLogAt = now;
+        hexLog("scroll:event", {
+          nativeY,
+          stateY: lastStateY,
+          deltaFromState: nativeY - lastStateY,
+          scrollEventCount,
+          rafPending: raf !== 0,
+          rafSkipCount,
+          msSinceNativeChange: Math.round(now - lastNativeChangeAt),
+          msSinceStateChange: Math.round(now - lastStateChangeAt),
+          maxScrollY: document.documentElement.scrollHeight - window.innerHeight,
+        });
+      }
+
+      if (raf) {
+        rafSkipCount += 1;
+        return;
+      }
+
       raf = window.requestAnimationFrame(() => {
-        setScrollY(window.scrollY);
+        const nextY = window.scrollY;
+        if (nextY !== lastStateY) {
+          lastStateY = nextY;
+          lastStateChangeAt = performance.now();
+          hexLog("scroll:state", {
+            scrollY: nextY,
+            scrollEventCount,
+            rafSkipCount,
+          });
+        } else {
+          hexWarn("scroll:raf-no-change", {
+            scrollY: nextY,
+            scrollEventCount,
+            rafSkipCount,
+            maxScrollY: document.documentElement.scrollHeight - window.innerHeight,
+          });
+        }
+        setScrollY(nextY);
         raf = 0;
       });
     };
 
+    const onWheel = (e: WheelEvent) => {
+      if (!hexDebugEnabled()) return;
+      // Only log when native scrollY hasn't moved recently — likely "stuck".
+      const now = performance.now();
+      if (now - lastNativeChangeAt < 400) return;
+      hexWarn("scroll:wheel-while-stuck", {
+        deltaY: e.deltaY,
+        nativeY: window.scrollY,
+        stateY: lastStateY,
+        maxScrollY: document.documentElement.scrollHeight - window.innerHeight,
+        defaultPrevented: e.defaultPrevented,
+        cancelable: e.cancelable,
+      });
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("wheel", onWheel, { passive: true });
     return () => {
+      hexLog("scroll:unlisten", { scrollEventCount, rafSkipCount, lastStateY });
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onWheel);
       if (raf) window.cancelAnimationFrame(raf);
     };
   }, []);
@@ -323,15 +484,9 @@ export default function HexagonsPage() {
     "2-4": {
       trigger: "2-2",
       inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
-      content: <img src={chainoutLogo} alt="ChainOut App" />,
+      content: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
       background: "#A4ED11",
-    },
-    "2-5": {
-      trigger: "2-2",
-      inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
-      content: "AzzzZZZZ",
-      background: "#FF8826",
-    },
+    }
   };
 
   const emptyCells: Record<string, true> = {
@@ -370,6 +525,14 @@ export default function HexagonsPage() {
   const overlapState = React.useMemo(() => {
     const activeScrollKeys = new Set<string>();
     const activeFixedKeys = new Set<string>();
+    const candidates: Array<{
+      scrollKey: string;
+      trigger: string;
+      screenTop: number;
+      fixedTop: number;
+      distance: number;
+      near: boolean;
+    }> = [];
 
     for (const cell of scrollingCells) {
       const scrollKey = `${cell.col}-${cell.row}`;
@@ -390,14 +553,79 @@ export default function HexagonsPage() {
       const fixedTop = fixedRow * hexHeight + colOffset;
       const screenTop = cell.top - scrollY;
       const distance = Math.abs(screenTop - fixedTop);
-      if (distance > nearThreshold) continue;
+      const near = distance <= nearThreshold;
+      candidates.push({
+        scrollKey,
+        trigger,
+        screenTop,
+        fixedTop,
+        distance,
+        near,
+      });
+      if (!near) continue;
 
       activeScrollKeys.add(scrollKey);
       activeFixedKeys.add(trigger);
     }
 
-    return { activeScrollKeys, activeFixedKeys };
+    return { activeScrollKeys, activeFixedKeys, candidates };
   }, [activeCellContent, activeFixedCellContent, hexHeight, nearThreshold, scrollY, scrollingCells]);
+
+  const prevOverlapSigRef = React.useRef("");
+  React.useEffect(() => {
+    const activeScroll = [...overlapState.activeScrollKeys].sort().join("|") || "(none)";
+    const activeFixed = [...overlapState.activeFixedKeys].sort().join("|") || "(none)";
+    const sig = `${activeScroll}::${activeFixed}`;
+    if (sig === prevOverlapSigRef.current) return;
+    prevOverlapSigRef.current = sig;
+
+    const nearest = [...overlapState.candidates]
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 6)
+      .map((c) => ({
+        key: c.scrollKey,
+        trigger: c.trigger,
+        dist: Math.round(c.distance),
+        near: c.near,
+        screenTop: Math.round(c.screenTop),
+        fixedTop: Math.round(c.fixedTop),
+      }));
+
+    hexLog("overlap:change", {
+      scrollY: Math.round(scrollY),
+      nearThreshold: Math.round(nearThreshold),
+      activeScroll,
+      activeFixed,
+      nearest,
+    });
+  }, [nearThreshold, overlapState, scrollY]);
+
+  // Heartbeat: if scrollY moves but nothing is near, still periodically sample distances
+  // so we can see whether effects "should" be firing.
+  const lastHeartbeatRef = React.useRef(0);
+  React.useEffect(() => {
+    if (!hexDebugEnabled()) return;
+    const now = performance.now();
+    if (now - lastHeartbeatRef.current < 500) return;
+    lastHeartbeatRef.current = now;
+    if (overlapState.activeScrollKeys.size > 0) return;
+
+    const nearest = [...overlapState.candidates]
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3);
+    if (nearest.length === 0) return;
+
+    hexLog("overlap:idle-nearest", {
+      scrollY: Math.round(scrollY),
+      nearest: nearest.map((c) => ({
+        key: c.scrollKey,
+        trigger: c.trigger,
+        dist: Math.round(c.distance),
+        threshold: Math.round(nearThreshold),
+        shortfall: Math.round(c.distance - nearThreshold),
+      })),
+    });
+  }, [nearThreshold, overlapState, scrollY]);
 
   const [scrollCellZByKey, setScrollCellZByKey] = React.useState<Record<string, number>>({});
   const prevActiveNarrowKeysRef = React.useRef<Set<string>>(new Set());
@@ -419,12 +647,25 @@ export default function HexagonsPage() {
     );
     const prev = prevActiveNarrowKeysRef.current;
     const newlyActive: string[] = [];
+    const newlyInactive: string[] = [];
 
     for (const key of current) {
       if (!prev.has(key)) newlyActive.push(key);
     }
+    for (const key of prev) {
+      if (!current.has(key)) newlyInactive.push(key);
+    }
 
     prevActiveNarrowKeysRef.current = current;
+
+    if (newlyActive.length === 0 && newlyInactive.length === 0) return;
+
+    hexLog("z:transition", {
+      newlyActive,
+      newlyInactive,
+      nextZBefore: nextScrollCellZRef.current,
+      currentActive: [...current],
+    });
 
     if (newlyActive.length === 0) return;
 
@@ -434,11 +675,48 @@ export default function HexagonsPage() {
         nextScrollCellZRef.current += 1;
         next[key] = nextScrollCellZRef.current;
       }
+      hexLog("z:assign", { assigned: newlyActive.map((k) => [k, next[k]]), map: next });
       return next;
     });
   }, [activeNarrowScrollKeySig]);
 
   const anyHexActive = overlapState.activeScrollKeys.size > 0;
+
+  // One-shot geometry dump when layout inputs change (resize / breakpoint).
+  React.useEffect(() => {
+    hexLog("layout", {
+      width,
+      height,
+      isNarrow,
+      columns,
+      hexWidth: Math.round(hexWidth),
+      hexHeight: Math.round(hexHeight),
+      viewportRows,
+      totalScrollRows,
+      contentHeight: Math.round(contentHeight),
+      hexSectionWouldBe: Math.round(totalScrollRows * hexHeight + hexHeight / 2),
+      nearThreshold: Math.round(nearThreshold),
+      activationFadeRange: Math.round(activationFadeRange),
+      contentKeys: Object.keys(activeCellContent),
+      fixedKeys: Object.keys(activeFixedCellContent),
+      maxScrollY: document.documentElement.scrollHeight - window.innerHeight,
+      docScrollHeight: document.documentElement.scrollHeight,
+    });
+    // Intentionally omit content object identities — they are recreated each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activationFadeRange,
+    columns,
+    contentHeight,
+    height,
+    hexHeight,
+    hexWidth,
+    isNarrow,
+    nearThreshold,
+    totalScrollRows,
+    viewportRows,
+    width,
+  ]);
 
   // Clip along the last row's hex bottoms (same shape as HEX_CLIP).
   const clipRow = totalScrollRows - 1;
@@ -460,19 +738,115 @@ export default function HexagonsPage() {
     ...[...bottomEdge].reverse(),
   ]);
 
+  // Portal keeps the backdrop on the viewport. A parent with overflow-x (even
+  // "hidden") can turn position:fixed into a scroll-relative containing block,
+  // which is what made this layer drift upward while scrolling.
+  const fixedHexLayer =
+    typeof document !== "undefined"
+      ? createPortal(
+          <div
+            aria-hidden
+            data-hex-fixed-layer
+            style={{
+              position: "fixed",
+              top: -hexHeight,
+              left: containerLeftPx,
+              // Use guarded layout height — not 100vh — so mobile chrome / DevTools
+              // cannot retarget the fixed box independently of our geometry.
+              height: height + hexHeight,
+              pointerEvents: "none",
+              width: containerWidthPx,
+              overflow: "hidden",
+              zIndex: 5,
+              background: "#363636",
+            }}
+          >
+            {fixedCells.map((cell) => {
+              const key = `${cell.col}-${cell.row}`;
+              const isActive = overlapState.activeFixedKeys.has(key);
+              const isFixedContentMarker = key in activeFixedCellContent;
+              const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
+              return (
+                <div
+                  key={`fixed-${cell.index}`}
+                  data-fixed-marker={isFixedContentMarker ? key : undefined}
+                  style={{
+                    position: "absolute",
+                    left: cell.left,
+                    top: cell.top,
+                    width: hexWidth,
+                    height: hexHeight,
+                    zIndex: 2,
+                    isolation: isFixedContentMarker ? "isolate" : undefined,
+                    transition: "background 140ms linear, box-shadow 140ms linear",
+                  }}
+                >
+                  {!anyHexActive ? (
+                    <HexClipStroke
+                      width={1}
+                      color={isActive ? "#2e2e2e" : "#2e2e2e"}
+                    />
+                  ) : null}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      clipPath: HEX_CLIP,
+                      WebkitClipPath: HEX_CLIP,
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    {isFixedContentMarker ? (
+                      <span style={FIXED_MARKER_LABEL} title={`${key} — ${markerLabel}`}>
+                        <span style={FIXED_MARKER_KEY}></span>
+                        <span style={FIXED_MARKER_TEXT}></span>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div
       style={{
         position: "relative",
         width: containerWidthPx,
         margin: "0 auto",
-        overflowX: "hidden",
+        // Do not set overflow-x here: it makes descendants' position:fixed
+        // scroll with this box in Chromium. Horizontal clip lives on body.
         background: "#2B2B2B",
       }}
     >
-      <h1 className="c64-font" style={{ position: "fixed", top: 0, left: "15px", zIndex: 100, color: "#ffffff", fontSize: "24px", fontWeight: 600, letterSpacing: -0.2, padding: "10px 12px" }}>
-        Par Henriksson
-      </h1>
+      {fixedHexLayer}
+      {typeof document !== "undefined"
+        ? createPortal(
+            <h1
+              className="c64-font"
+              style={{
+                position: "fixed",
+                top: 0,
+                left: "15px",
+                zIndex: 100,
+                color: "#ffffff",
+                fontSize: "24px",
+                fontWeight: 600,
+                letterSpacing: -0.2,
+                padding: "10px 12px",
+                margin: 0,
+                pointerEvents: "none",
+              }}
+            >
+              Par Henriksson
+            </h1>,
+            document.body
+          )
+        : null}
 
       <section
         style={{
@@ -660,68 +1034,6 @@ export default function HexagonsPage() {
         </div>
       </section>
 
-      <div
-        style={{
-          position: "fixed",
-          top: -hexHeight,
-          left: containerLeftPx,
-          height: "calc(100vh + " + (hexHeight) + "px)",
-          pointerEvents: "none",
-          width: containerWidthPx,
-          overflow: "hidden",
-          zIndex: 5,
-          background: "#363636",
-        }}
-      >
-        {fixedCells.map((cell) => {
-          const key = `${cell.col}-${cell.row}`;
-          const isActive = overlapState.activeFixedKeys.has(key);
-          const isFixedContentMarker = key in activeFixedCellContent;
-          const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
-          return (
-            <div
-              key={`fixed-${cell.index}`}
-              data-fixed-marker={isFixedContentMarker ? key : undefined}
-              style={{
-                position: "absolute",
-                left: cell.left,
-                top: cell.top,
-                width: hexWidth,
-                height: hexHeight,
-                transform: "scale(1)",
-                zIndex: 2,
-                isolation: isFixedContentMarker ? "isolate" : undefined,
-                transition: "background 140ms linear, box-shadow 140ms linear",
-              }}
-            >
-              {!anyHexActive ? (
-                <HexClipStroke
-                  width={1}
-                  color={isActive ? "#2e2e2e" : "#2e2e2e"}
-                />
-              ) : null}
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  clipPath: HEX_CLIP,
-                  WebkitClipPath: HEX_CLIP,
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                {isFixedContentMarker ? (
-                  <span style={FIXED_MARKER_LABEL} title={`${key} — ${markerLabel}`}>
-                    <span style={FIXED_MARKER_KEY}></span>
-                    <span style={FIXED_MARKER_TEXT}></span>
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       <section
         aria-label="Next"
         style={{
@@ -729,7 +1041,9 @@ export default function HexagonsPage() {
           zIndex: 8,
           // Tuck up to the even-column flats so the next section fills the zig-zag notches.
           marginTop: evenBottomY - hexSectionHeight,
-          minHeight: height
+          minHeight: height,
+          background:
+            "linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 35%, transparent 70%)",
         }}
       >
 
