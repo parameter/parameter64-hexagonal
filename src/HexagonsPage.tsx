@@ -282,6 +282,7 @@ export default function HexagonsPage() {
   const cellContentNarrow: Record<string, ScrollCellContentEntry> = {
     "1-2": {
       trigger: "1-1",
+      inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
       content: <>
         <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />
         <div className="hex-active-only">
@@ -292,6 +293,7 @@ export default function HexagonsPage() {
     },
     "2-2": {
       trigger: "2-2",
+      inactiveContent: <img width="70" height="70" src={chainoutLogo} alt="ChainOut App" />,
       content: (
         <>
           <img width="70" height="70" src={chainoutLogo} alt="ChainOut App" />
@@ -308,11 +310,13 @@ export default function HexagonsPage() {
     },
     "2-4": {
       trigger: "2-2",
+      inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
       content: <img src={chainoutLogo} alt="ChainOut App" />,
       background: "#A4ED11",
     },
     "2-5": {
       trigger: "2-2",
+      inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
       content: "AzzzZZZZ",
       background: "#FF8826",
     },
@@ -617,6 +621,26 @@ export default function HexagonsPage() {
                       {entry.content}
                     </h2>
                   ) : null}
+                  {entry && !isActive ? (
+                    <h2
+                      className="hex-headline"
+                      style={{
+                        position: "relative",
+                        zIndex: 1,
+                        margin: 0,
+                        padding: "10px 12px",
+                        fontWeight: 650,
+                        letterSpacing: -0.2,
+                        textAlign: "center",
+                        fontSize: "1em",
+                        lineHeight: "1.3em",
+                        color: "#ffffff",
+                        mixBlendMode: "luminosity"
+                      }}
+                    >
+                      {entry.inactiveContent}
+                    </h2>
+                  ) : null}
                 </div>
               </div>
             );
@@ -695,7 +719,16 @@ export default function HexagonsPage() {
           marginTop: evenBottomY - hexSectionHeight,
           minHeight: height
         }}
-      />
+      >
+
+        <div className="text-stuff-section">
+
+          <h1 className="portfolio-headline">Hi, Par here. I've been building things for the web since 2010.</h1>
+        
+        
+        </div>
+      
+      </section>
       
     </div>
   );
