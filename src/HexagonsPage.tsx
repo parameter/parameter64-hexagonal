@@ -64,15 +64,27 @@ function HexClipStroke({ width, color }: { width: number, color: string }) {
 
 function HexClip({ width, color }: { width: number, color: string }) {
   return (
-    
+    <svg
+      aria-hidden
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        overflow: "visible",
+        pointerEvents: "none",
+      }}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
       <polygon
         points={HEX_SVG_POINTS}
         fill="none"
-        stroke={color}
+        stroke={"#242424"}
         strokeWidth={width}
         vectorEffect="nonScalingStroke"
       />
-    
+    </svg>
   );
 }
 
