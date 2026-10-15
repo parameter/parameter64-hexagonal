@@ -43,6 +43,97 @@ h1 {
   transition: transform 0.3s ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear;
 }
 
+.c64-font {
+  font-family: c64;
+}
+
+.hex-headline {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 400;
+}
+
+.mono-font {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Neon sign flicker — adapted from https://codepen.io/nodws/pen/WNjXbr */
+.open-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 2px;
+}
+
+.open-chip b {
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #efe;
+  text-shadow:
+    0 -40px 100px,
+    0 0 2px,
+    0 0 1em #44ff66,
+    0 0 0.5em #44ff66,
+    0 0 0.1em #44ff66,
+    3px 7px 3px #000;
+}
+
+.tech-list {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin: 10px 0 0 0;
+}
+
+.tech-list span {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 15px 0 0
+}
+
+.open-chip b span {
+  animation: open-neon-blink linear infinite 2s;
+}
+
+.open-chip b span:nth-of-type(2) {
+  animation: open-neon-blink linear infinite 3s;
+}
+
+@keyframes open-neon-blink {
+  78% {
+    color: inherit;
+    text-shadow: inherit;
+  }
+  79% {
+    color: #333;
+  }
+  80% {
+    text-shadow: none;
+  }
+  81% {
+    color: inherit;
+    text-shadow: inherit;
+  }
+  82% {
+    color: #333;
+    text-shadow: none;
+  }
+  83% {
+    color: inherit;
+    text-shadow: inherit;
+  }
+  92% {
+    color: #333;
+    text-shadow: none;
+  }
+  92.5% {
+    color: inherit;
+    text-shadow: inherit;
+  }
+}
+
 .hex-headline img {
   margin: 0 0 10px 0;
 }
@@ -50,18 +141,85 @@ h1 {
 .text-stuff-section {
   position: absolute;
   height: 100%;
-  top: 150px;
-  left: 70px;
+  top: 200px;
+  left: 50%;
+  transform: translateX(-50%);
   right: 70px;
+  color: #ffffff;
+  width: 100%;
+  max-width: 800px;
+}
+
+.text-stuff-section-inner {
+  padding: 0 40px;
+}
+
+@media (max-width: 900px) {
+  .text-stuff-section {
+    top: 160px;
+  }
+}
+
+h1,h2,h3,h4,h5,h6,p,ul,ol,li,a {
+  margin: 0;
+  padding: 0;
+  letter-spacing: -0.2;
   color: #ffffff;
 }
 
 .portfolio-headline {
+  display: flex;
+  flex-direction: row;
   font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.2;
-  padding: 10px 12px;
+  padding: 10px 0;
+  line-height: 1.2;
+  margin-bottom: 10px;
 }
+
+.portfolio-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.portfolio-p,
+.portfolio-list li a {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.2;
+  padding: 10px 0 10px 0;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.portfolio-list li section {
+  margin: 0 0 40px 0;
+}
+
+
+.portfolio-subtitle {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.2;
+  padding: 10px 0 10px 0;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+  margin-bottom: 20px;
+}
+
+
+.italic {
+  font-style: italic;
+}
+
+.orange-color {
+  color: #ff8c00;
+}
+
 
 .logo {
   height: 6em;

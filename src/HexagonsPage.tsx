@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import chainoutLogo from "./images/chainout-logo-4.svg";
 import bidstackerLogo from "./images/bidstacker.png";
+import mePhoto from "./images/me.webp";
 
 /** Set to false (or open console and run `window.__HEX_DEBUG = false`) to silence. */
 const HEX_DEBUG = true;
@@ -63,7 +64,7 @@ const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)"
 
 /** First z-index assigned to a narrow cell; global counter increases from here. */
 const SCROLL_CELL_Z_BASE = 40;
-/** Fixed z-index for cellContent (wide) cells — no iteration. */
+/** Fixed z-index for non-content scroll cells. */
 const SCROLL_CELL_Z_WIDE = 3;
 const SCROLL_CELL_Z_DEFAULT = 2;
 
@@ -158,23 +159,31 @@ const FIXED_MARKER_TEXT: React.CSSProperties = {
 };
 
 /**
+ * Layout viewport width — matches html/body (excludes classic scrollbar gutter).
+ * Using innerWidth made fixed/page layers 14px wider than body on Windows.
+ */
+function layoutViewportWidth() {
+  return document.documentElement.clientWidth;
+}
+
+/**
  * Viewport size for layout/scroll geometry.
  * Guards against height-only shrinks (mobile chrome, soft keyboard, docked
  * DevTools) which would rebuild the hex section shorter and clamp scroll mid-gesture.
  */
 function useViewport(): Viewport {
   const [viewport, setViewport] = React.useState<Viewport>(() => ({
-    width: window.innerWidth,
+    width: layoutViewportWidth(),
     height: window.innerHeight,
   }));
   const stableRef = React.useRef<Viewport>({
-    width: window.innerWidth,
+    width: layoutViewportWidth(),
     height: window.innerHeight,
   });
 
   React.useEffect(() => {
     const applyResize = () => {
-      const nextWidth = window.innerWidth;
+      const nextWidth = layoutViewportWidth();
       const nextHeight = window.innerHeight;
       const prev = stableRef.current;
       const widthChanged = Math.abs(nextWidth - prev.width) >= 1;
@@ -395,6 +404,48 @@ function smoothstep01(n: number) {
   return t * t * (3 - 2 * t);
 }
 
+/** Content is authored for 4 columns. Wide screens add an even number of side
+ *  columns so odd/even stagger (and thus the honeycomb) matches narrow. */
+const CONTENT_COLUMNS = 4;
+/** Cap the colored/content hex band at this width on large viewports. */
+const CONTENT_MAX_WIDTH = 900;
+/** Empty columns on each side when wide. Must be even to preserve stagger parity. */
+const WIDE_SIDE_COLUMNS = 2;
+
+function shiftColKey(key: string, colShift: number): string {
+  if (colShift === 0) return key;
+  const [colStr, rowStr] = key.split("-");
+  const col = Number(colStr);
+  const row = Number(rowStr);
+  if (!Number.isFinite(col) || !Number.isFinite(row)) return key;
+  return `${col + colShift}-${row}`;
+}
+
+function shiftKeyRecord<T>(record: Record<string, T>, colShift: number): Record<string, T> {
+  if (colShift === 0) return record;
+  const out: Record<string, T> = {};
+  for (const [key, value] of Object.entries(record)) {
+    out[shiftColKey(key, colShift)] = value;
+  }
+  return out;
+}
+
+function shiftCellContent(
+  record: Record<string, ScrollCellContentEntry>,
+  colShift: number
+): Record<string, ScrollCellContentEntry> {
+  if (colShift === 0) return record;
+  const out: Record<string, ScrollCellContentEntry> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    const trigger = entry.trigger.trim();
+    out[shiftColKey(key, colShift)] = {
+      ...entry,
+      trigger: trigger ? shiftColKey(trigger, colShift) : entry.trigger,
+    };
+  }
+  return out;
+}
+
 /**
  * Scroll-driven opacity toward a fixed trigger: 0 when far away (appearing),
  * 1 inside the activation band (nearThreshold).
@@ -415,14 +466,19 @@ export default function HexagonsPage() {
   const { width, height } = useViewport();
   const scrollY = useScrollY();
 
-  const isNarrow = width <= 900;
-  const columns = isNarrow ? 4 : 6;
-  const denom = 1 + (columns - 1) * 0.75;
-  // Make the grid slightly wider than the viewport so it clips symmetrically
-  // when shifted by xOffset = -stepX/2 (same clip on left and right).
-  const sceneWidth = width / (1 - 0.75 / denom);
-  const hexWidth = sceneWidth / denom;
+  const isNarrow = width <= CONTENT_MAX_WIDTH;
+  // Hex size from the 4-col content band, capped at CONTENT_MAX_WIDTH so wide
+  // viewports keep the same content scale as a 900px layout. Side columns fill out.
+  const sideColumns = isNarrow ? 0 : WIDE_SIDE_COLUMNS;
+  const columns = CONTENT_COLUMNS + sideColumns * 2;
+  const colShift = sideColumns;
+  const contentLayoutWidth = Math.min(width, CONTENT_MAX_WIDTH);
+  const contentDenom = 1 + (CONTENT_COLUMNS - 1) * 0.75;
+  const contentSceneWidth = contentLayoutWidth / (1 - 0.75 / contentDenom);
+  const hexWidth = contentSceneWidth / contentDenom;
   const hexHeight = hexWidth * 0.8660254;
+  const denom = 1 + (columns - 1) * 0.75;
+  const sceneWidth = hexWidth * denom;
   const viewportRows = Math.ceil(height / hexHeight) + 2;
   const scrollScreens = 1;
   const totalScrollRows = Math.ceil((height * scrollScreens) / hexHeight) + 2;
@@ -431,28 +487,16 @@ export default function HexagonsPage() {
   /** How far from the trigger the tint starts rising (scroll-driven 0 → 1). */
   const activationFadeRange = height * 0.75;
   const containerWidthPx = width;
-  // Keep clipping symmetric by centering the wider scene inside the viewport container.
+  // Center the (possibly wider) scene; side columns clip outside the viewport.
   const xOffset = (containerWidthPx - sceneWidth) / 2;
   const containerLeftPx = (width - containerWidthPx) / 2;
 
-  const cellContent: Record<string, ScrollCellContentEntry> = {
-    "2-2": {
-      trigger: "1-1",
-      content: "Hello",
-    },
-    "3-12": {
-      trigger: "",
-      content: "World",
-    },
-  };
-
   // #2773F5
-
   // #A4ED11
-
   // #FFBF00
 
-  const cellContentNarrow: Record<string, ScrollCellContentEntry> = {
+  /** Author content in mobile (4-col) coordinates; shifted for desktop. */
+  const cellContentBase: Record<string, ScrollCellContentEntry> = {
     "1-2": {
       trigger: "1-1",
       inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
@@ -486,37 +530,29 @@ export default function HexagonsPage() {
       inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
       content: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
       background: "#A4ED11",
-    }
+    },
   };
 
-  const emptyCells: Record<string, true> = {
+  const emptyCellsBase: Record<string, true> = {
     "1-1": true,
     "2-3": true,
   };
 
-  const activeCellContent = isNarrow ? cellContentNarrow : cellContent;
+  const fixedCellContentBase: Record<string, string> = {
+    "1-1": "Hello Narrow 2",
+    "2-2": "World Narrow 2",
+    "1-2": "Foo Narrow",
+  };
+
+  const activeCellContent = shiftCellContent(cellContentBase, colShift);
+  const emptyCells = shiftKeyRecord(emptyCellsBase, colShift);
+  const activeFixedCellContent = shiftKeyRecord(fixedCellContentBase, colShift);
 
   const scrollingCells = React.useMemo(
     () => buildCells(columns, totalScrollRows, hexWidth, hexHeight, xOffset),
     [columns, totalScrollRows, hexHeight, hexWidth, xOffset]
   );
 
-  const fixedCellContent: Record<string, string> = {
-    "1-1": "Hello",
-    "2-2": "World",
-    "3-1": "Foo",
-    "4-2": "Bar",
-  };
-
-  const fixedCellContentNarrow: Record<string, string> = {
-    "1-1": "Hello Narrow 2",
-    "2-2": "World Narrow 2",
-    "1-2": "Foo Narrow",
-    // "2-1": "Bar Narrow",
-  };
-
-  const activeFixedCellContent = isNarrow ? fixedCellContentNarrow : fixedCellContent;
- 
   const fixedCells = React.useMemo(
     () => buildCells(columns, viewportRows, hexWidth, hexHeight, xOffset),
     [columns, viewportRows, hexHeight, hexWidth, xOffset]
@@ -635,10 +671,10 @@ export default function HexagonsPage() {
   const activeNarrowScrollKeySig = React.useMemo(
     () =>
       [...overlapState.activeScrollKeys]
-        .filter((k) => k in cellContentNarrow)
+        .filter((k) => k in activeCellContent)
         .sort()
         .join("|"),
-    [overlapState.activeScrollKeys]
+    [activeCellContent, overlapState.activeScrollKeys]
   );
 
   React.useEffect(() => {
@@ -688,6 +724,8 @@ export default function HexagonsPage() {
       width,
       height,
       isNarrow,
+      sideColumns,
+      colShift,
       columns,
       hexWidth: Math.round(hexWidth),
       hexHeight: Math.round(hexHeight),
@@ -781,12 +819,12 @@ export default function HexagonsPage() {
                     transition: "background 140ms linear, box-shadow 140ms linear",
                   }}
                 >
-                  {!anyHexActive ? (
+                  {
                     <HexClipStroke
                       width={1}
-                      color={isActive ? "#2e2e2e" : "#2e2e2e"}
+                      color={anyHexActive ? "#2e2e2e" : "#313131"}
                     />
-                  ) : null}
+                  }
                   <div
                     style={{
                       position: "absolute",
@@ -826,24 +864,60 @@ export default function HexagonsPage() {
       {fixedHexLayer}
       {typeof document !== "undefined"
         ? createPortal(
-            <h1
-              className="c64-font"
+            <div
               style={{
                 position: "fixed",
-                top: 0,
+                top: "12px",
                 left: "15px",
                 zIndex: 100,
-                color: "#ffffff",
-                fontSize: "24px",
-                fontWeight: 600,
-                letterSpacing: -0.2,
                 padding: "10px 12px",
-                margin: 0,
                 pointerEvents: "none",
               }}
             >
-              Par Henriksson
-            </h1>,
+              <h1
+                className="c64-font"
+                style={{
+                  color: "#ffffff",
+                  fontSize: "24px",
+                  fontWeight: 600,
+                  letterSpacing: -0.2,
+                  margin: 0,
+                }}
+              >
+                Par Henriksson
+              </h1>
+              <p
+                className="mono-font"
+                style={{
+                  color: "rgba(255, 255, 255, 0.8)",
+                  fontSize: "17px",
+                  fontWeight: 400,
+                  margin: "4px 0 0",
+                }}
+              >
+                programmer, developer, builder
+              </p>
+            </div>,
+            document.body
+          )
+        : null}
+      {typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="mono-font open-chip"
+              style={{
+                position: "fixed",
+                top: "13px",
+                right: "24px",
+                zIndex: 100,
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            >
+              <b>
+                O<span>P</span>E<span>N</span>
+              </b>
+            </div>,
             document.body
           )
         : null}
@@ -853,6 +927,7 @@ export default function HexagonsPage() {
           position: "relative",
           height: hexSectionHeight,
           zIndex: 10,
+          overflow: "hidden"
         }}
       >
         {/* Grey hex backdrop with zig-zag bottom; skips emptyCells so those stay true holes. */}
@@ -950,8 +1025,8 @@ export default function HexagonsPage() {
                   height: hexHeight,
                   transform: isActive ? "scale(1.2)" : "scale(1)",
                   transformOrigin: "center",
-                  // Z-index iteration only for cellContentNarrow keys; wide content uses a fixed layer.
-                  zIndex: key in cellContentNarrow
+                  // Content cells bump z on activation so the newest active hex stacks on top.
+                  zIndex: key in activeCellContent
                     ? (scrollCellZByKey[key] ?? SCROLL_CELL_Z_BASE)
                     : entry
                       ? SCROLL_CELL_Z_WIDE
@@ -995,7 +1070,7 @@ export default function HexagonsPage() {
                         zIndex: 1,
                         margin: 0,
                         padding: "10px 12px",
-                        fontWeight: 650,
+                        fontWeight: 400,
                         letterSpacing: -0.2,
                         textAlign: "center",
                         fontSize: "1em",
@@ -1049,8 +1124,46 @@ export default function HexagonsPage() {
 
         <div className="text-stuff-section">
 
-          <h1 className="portfolio-headline">Hi, Par here. I've been building things for the web since 2010.</h1>
-        
+          <div className="text-stuff-section-inner">
+
+            <h1 className="portfolio-headline">
+              I build applications for the web and mobiles, on my own and sometimes together with a client with an idea we take to market.
+            </h1>
+
+            <h4 className="portfolio-subtitle italic orange-color">Here are some recent things</h4>
+
+            <ul className="portfolio-list">
+              <li>
+                <section>
+                  <a href="https://bidstacker.com" target="_blank" rel="noopener noreferrer">Bidstacker AB</a>
+                  <p>Tech lead, builder/developer, founder and owner.</p>
+                  <p>We verified and then built the product we are now optimizing for different types of users.</p>
+                </section>
+              </li>
+              <li>
+                <section>
+                  <a href="https://chainout.app" target="_blank" rel="noopener noreferrer">ChainOut App</a>
+                  <p>Tech lead and full stack developer.</p>
+                  <p>With a finished app we are now bootstrapping it with sponsors, disgolf course managers and players.</p>
+                </section>
+              </li>
+              <li>
+                <section>
+                  <a href="https://idyo.ai" target="_blank" rel="noopener noreferrer">IDYO AI</a>
+                  <p>Developer.</p>
+                  <p>Just an ordinary website job.</p>
+                </section>
+              </li>
+            </ul>
+
+            <p className="portfolio-p">
+              I'd love to hear what you are doing.
+            </p>
+            <p className="portfolio-p">
+              <a href="mailto:parameter64@proton.me">parameter64@proton.me</a>
+            </p>
+
+          </div>
         
         </div>
       
