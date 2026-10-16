@@ -479,8 +479,9 @@ export default function HexagonsPage() {
   const contentLayoutWidth = Math.min(width, CONTENT_MAX_WIDTH);
   const contentDenom = 1 + (CONTENT_COLUMNS - 1) * 0.75;
   const contentSceneWidth = contentLayoutWidth / (1 - 0.75 / contentDenom);
+  // Narrow stays at 1 so the scene clips edge-to-edge; mid-width keeps 0.7.
   const hexScale =
-    width < HEX_SCALE_BREAKPOINT ? HEX_SCALE_BELOW_BREAKPOINT : 1;
+    !isNarrow && width < HEX_SCALE_BREAKPOINT ? HEX_SCALE_BELOW_BREAKPOINT : 1;
   const hexWidth = (contentSceneWidth / contentDenom) * hexScale;
   const hexHeight = hexWidth * 0.8660254;
   const denom = 1 + (columns - 1) * 0.75;
