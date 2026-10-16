@@ -4,20 +4,28 @@ import MasonryIdeaPage from "./MasonryIdeaPage";
 import OrganicMasonryPage from "./OrganicMasonryPage";
 import HexagonsPage from "./HexagonsPage";
 
+function getPath() {
+  return window.location.pathname.replace(/^\//, "").replace(/\/$/, "");
+}
+
 export default function App() {
-  const [hash, setHash] = React.useState(() => window.location.hash || "#/video");
+  const [path, setPath] = React.useState(() => getPath());
 
   React.useEffect(() => {
-    const onHashChange = () => setHash(window.location.hash || "#/video");
-    window.addEventListener("hashchange", onHashChange);
-    if (!window.location.hash) window.location.hash = "#/video";
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+    // Migrate old hash routes (#/video → /video)
+    const hashRoute = window.location.hash.replace(/^#\/?/, "");
+    if (hashRoute) {
+      window.history.replaceState(null, "", `/${hashRoute}`);
+      setPath(hashRoute);
+    }
 
-  const path = hash.replace(/^#\/?/, "");
+    const onPopState = () => setPath(getPath());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   if (path === "masonry-idea") return <MasonryIdeaPage />;
   if (path === "organic-masonry") return <OrganicMasonryPage />;
-  if (path === "hexagons") return <HexagonsPage />;
-  return <VideoSphereScene />;
+  if (path === "video") return <VideoSphereScene />;
+  return <HexagonsPage />;
 }

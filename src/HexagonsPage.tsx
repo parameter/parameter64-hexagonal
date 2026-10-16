@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import chainoutLogo from "./images/chainout-logo-4.svg";
 import bidstackerLogo from "./images/bidstacker.png";
+import parameter64Logo from "./images/parameter64.png";
 import mePhoto from "./images/me.webp";
 
 /** Set to false (or open console and run `window.__HEX_DEBUG = false`) to silence. */
@@ -411,6 +412,10 @@ const CONTENT_COLUMNS = 4;
 const CONTENT_MAX_WIDTH = 900;
 /** Empty columns on each side when wide. Must be even to preserve stagger parity. */
 const WIDE_SIDE_COLUMNS = 2;
+/** Viewport width (px) at/above which hexes keep full size. Laptop-ish. */
+const HEX_SCALE_BREAKPOINT = 1400;
+/** Hex size multiplier when width is below HEX_SCALE_BREAKPOINT (1 = full size). */
+const HEX_SCALE_BELOW_BREAKPOINT = 0.7;
 
 function shiftColKey(key: string, colShift: number): string {
   if (colShift === 0) return key;
@@ -475,13 +480,20 @@ export default function HexagonsPage() {
   const contentLayoutWidth = Math.min(width, CONTENT_MAX_WIDTH);
   const contentDenom = 1 + (CONTENT_COLUMNS - 1) * 0.75;
   const contentSceneWidth = contentLayoutWidth / (1 - 0.75 / contentDenom);
-  const hexWidth = contentSceneWidth / contentDenom;
+  const hexScale =
+    width < HEX_SCALE_BREAKPOINT ? HEX_SCALE_BELOW_BREAKPOINT : 1;
+  const hexWidth = (contentSceneWidth / contentDenom) * hexScale;
   const hexHeight = hexWidth * 0.8660254;
   const denom = 1 + (columns - 1) * 0.75;
   const sceneWidth = hexWidth * denom;
   const viewportRows = Math.ceil(height / hexHeight) + 2;
   const scrollScreens = 1;
-  const totalScrollRows = Math.ceil((height * scrollScreens) / hexHeight) + 2;
+  // At least 5 rows so authored cells through row 4 (e.g. "2-4") always print,
+  // even on short viewports where height-based count would drop them.
+  const totalScrollRows = Math.max(
+    5,
+    Math.ceil((height * scrollScreens) / hexHeight) + 2
+  );
   const contentHeight = totalScrollRows * hexHeight + hexHeight;
   const nearThreshold = hexHeight * 0.25;
   /** How far from the trigger the tint starts rising (scroll-driven 0 → 1). */
@@ -499,10 +511,10 @@ export default function HexagonsPage() {
   const cellContentBase: Record<string, ScrollCellContentEntry> = {
     "1-2": {
       trigger: "1-1",
-      inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
+      inactiveContent: <img style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={bidstackerLogo} alt="Bidstacker AB" />,
       content: <>
-        <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />
-        <div className="hex-active-only">
+        <img style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={bidstackerLogo} alt="Bidstacker AB" />
+        <div style={{ color: "#453300" }} className="hex-active-only">
           Architecture <br />and backend for<br /> mobile app.
         </div>
       </>,
@@ -510,10 +522,26 @@ export default function HexagonsPage() {
     },
     "2-2": {
       trigger: "2-2",
-      inactiveContent: <img width="70" height="70" src={chainoutLogo} alt="ChainOut App" />,
+      inactiveContent: (
+        <img
+          className="hex-img-luminosity"
+          style={{ width: "100%", maxWidth: "25%" }}
+          width="auto"
+          height="auto"
+          src={chainoutLogo}
+          alt="ChainOut App"
+        />
+      ),
       content: (
         <>
-          <img width="70" height="70" src={chainoutLogo} alt="ChainOut App" />
+          <img
+            className="hex-img-luminosity"
+            style={{ width: "100%", maxWidth: "25%" }}
+            width="auto"
+            height="auto"
+            src={chainoutLogo}
+            alt="ChainOut App"
+          />
           <div className="hex-active-only">
             ChainOut
             <br />
@@ -527,8 +555,15 @@ export default function HexagonsPage() {
     },
     "2-4": {
       trigger: "2-2",
-      inactiveContent: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
-      content: <img width="auto" height="40" src={bidstackerLogo} alt="Bidstacker AB" />,
+      inactiveContent: <img style={{ width: "100%", maxWidth: "70%" }} style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />,
+      content: <>
+      <img style={{ width: "100%", maxWidth: "70%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />
+      <div style={{ color: "#385105" }} className="hex-active-only">
+        web, applications and   
+        <br />
+        everything since 2010
+      </div>
+      </>,
       background: "#A4ED11",
     },
   };
@@ -1062,44 +1097,16 @@ export default function HexagonsPage() {
                       }}
                     />
                   ) : null}
-                  {entry && (isActive) ? (
+                  {entry ? (
                     <h2
-                      className="hex-headline"
-                      style={{
-                        position: "relative",
-                        zIndex: 1,
-                        margin: 0,
-                        padding: "10px 12px",
-                        fontWeight: 400,
-                        letterSpacing: -0.2,
-                        textAlign: "center",
-                        fontSize: "1em",
-                        lineHeight: "1.3em",
-                        color: "#ffffff",
-                        mixBlendMode: "luminosity"
-                      }}
+                      className={`hex-headline${isActive ? " is-active" : ""}`}
                     >
-                      {entry.content}
-                    </h2>
-                  ) : null}
-                  {entry && !isActive ? (
-                    <h2
-                      className="hex-headline"
-                      style={{
-                        position: "relative",
-                        zIndex: 1,
-                        margin: 0,
-                        padding: "10px 12px",
-                        fontWeight: 650,
-                        letterSpacing: -0.2,
-                        textAlign: "center",
-                        fontSize: "1em",
-                        lineHeight: "1.3em",
-                        color: "#ffffff",
-                        mixBlendMode: "luminosity"
-                      }}
-                    >
-                      {entry.inactiveContent}
+                      <div className="hex-inactive-content">
+                        {entry.inactiveContent}
+                      </div>
+                      <div className="hex-active-content">
+                        {entry.content}
+                      </div>
                     </h2>
                   ) : null}
                 </div>
@@ -1116,6 +1123,7 @@ export default function HexagonsPage() {
           zIndex: 8,
           // Tuck up to the even-column flats so the next section fills the zig-zag notches.
           marginTop: evenBottomY - hexSectionHeight,
+          paddingBottom: "160px",
           minHeight: height,
           background:
             "linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 35%, transparent 70%)",
@@ -1126,9 +1134,9 @@ export default function HexagonsPage() {
 
           <div className="text-stuff-section-inner">
 
-            <h1 className="portfolio-headline">
+            <p className="portfolio-headline">
               I build applications for the web and mobiles, on my own and sometimes together with a client with an idea we take to market.
-            </h1>
+            </p>
 
             <h4 className="portfolio-subtitle italic orange-color">Here are some recent things</h4>
 

@@ -96,18 +96,21 @@ const TILES: TileSpec[] = [
   },
 ];
 
-function useHashPath() {
-  const [hash, setHash] = React.useState(() => window.location.hash || "");
+function usePath() {
+  const [path, setPath] = React.useState(() =>
+    window.location.pathname.replace(/^\//, "").replace(/\/$/, "")
+  );
   React.useEffect(() => {
-    const onHashChange = () => setHash(window.location.hash || "");
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    const onPopState = () =>
+      setPath(window.location.pathname.replace(/^\//, "").replace(/\/$/, ""));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
-  return hash.replace(/^#\/?/, "");
+  return path;
 }
 
 export default function OrganicMasonryPage() {
-  const path = useHashPath();
+  const path = usePath();
 
   return (
     <div
@@ -148,7 +151,7 @@ export default function OrganicMasonryPage() {
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <a
-              href="#/masonry-idea"
+              href="/masonry-idea"
               style={{
                 padding: "10px 12px",
                 borderRadius: 10,
@@ -160,7 +163,7 @@ export default function OrganicMasonryPage() {
               Masonry
             </a>
             <a
-              href="#/organic-masonry"
+              href="/organic-masonry"
               style={{
                 padding: "10px 12px",
                 borderRadius: 10,
@@ -172,7 +175,7 @@ export default function OrganicMasonryPage() {
               Organic
             </a>
             <a
-              href="#/video"
+              href="/video"
               style={{
                 padding: "10px 12px",
                 borderRadius: 10,

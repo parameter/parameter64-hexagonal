@@ -29,6 +29,26 @@ body {
   overflow-x: hidden;
 }
 
+.hex-headline {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 10px 12px;
+  font-weight: 400;
+  letter-spacing: -0.2;
+  text-align: center;
+  font-size: 1em;
+  line-height: 1.3em;
+  color: #ffffff;
+}
+
+@media (max-width: 1400px) {
+  .hex-headline {
+    font-size: 0.9em;
+  }
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
@@ -135,7 +155,63 @@ h1 {
 }
 
 .hex-headline img {
-  margin: 0 0 10px 0;
+  margin: 0 0 4px 0;
+}
+
+.hex-img-luminosity {
+  mix-blend-mode: luminosity;
+}
+
+/* Stack layers; fade/move children (not wrappers) so img mix-blend-mode still hits the tint. */
+.hex-inactive-content,
+.hex-active-content {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hex-inactive-content > *,
+.hex-active-content > * {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.hex-inactive-content > * {
+  opacity: 1;
+}
+
+.hex-active-content > * {
+  opacity: 0;
+}
+
+/* Logo rises with the text slot (~half of 3-line block) so it eases instead of snapping. */
+.hex-headline:has(.hex-active-only) {
+  --hex-img-rise: 1.85em;
+}
+
+.hex-headline:has(.hex-active-only) .hex-active-content > img {
+  transform: translateY(var(--hex-img-rise));
+}
+
+.hex-headline:has(.hex-active-only).is-active .hex-inactive-content > img {
+  transform: translateY(calc(-1 * var(--hex-img-rise)));
+}
+
+.hex-headline:has(.hex-active-only).is-active .hex-active-content > img {
+  transform: translateY(0);
+}
+
+.hex-headline.is-active .hex-inactive-content {
+  pointer-events: none;
+}
+
+.hex-headline.is-active .hex-inactive-content > * {
+  opacity: 0;
+}
+
+.hex-headline.is-active .hex-active-content > * {
+  opacity: 1;
 }
 
 .text-stuff-section {
