@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import chainoutLogo from "./images/chainout-logo-4.svg";
 import bidstackerLogo from "./images/bidstacker.png";
 import parameter64Logo from "./images/parameter64.png";
-import mePhoto from "./images/me.webp";
 
 /** Set to false (or open console and run `window.__HEX_DEBUG = false`) to silence. */
 const HEX_DEBUG = true;
@@ -98,7 +97,7 @@ function HexClipStroke({ width, color }: { width: number, color: string }) {
   );
 }
 
-function HexClip({ width, color }: { width: number, color: string }) {
+function HexClip() {
   return (
     <svg
       aria-hidden
@@ -116,7 +115,7 @@ function HexClip({ width, color }: { width: number, color: string }) {
       <polygon
         points={HEX_SVG_POINTS}
         fill="none"
-        stroke={"#242424"}
+        stroke="#242424"
         strokeWidth={0}
         vectorEffect="nonScalingStroke"
       />
@@ -555,7 +554,7 @@ export default function HexagonsPage() {
     },
     "2-4": {
       trigger: "2-2",
-      inactiveContent: <img style={{ width: "100%", maxWidth: "70%" }} style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />,
+      inactiveContent: <img style={{ width: "100%", maxWidth: "70%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />,
       content: <>
       <img style={{ width: "100%", maxWidth: "70%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />
       <div style={{ color: "#385105" }} className="hex-active-only">
@@ -836,7 +835,6 @@ export default function HexagonsPage() {
           >
             {fixedCells.map((cell) => {
               const key = `${cell.col}-${cell.row}`;
-              const isActive = overlapState.activeFixedKeys.has(key);
               const isFixedContentMarker = key in activeFixedCellContent;
               const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
               return (
@@ -1068,10 +1066,7 @@ export default function HexagonsPage() {
                       : SCROLL_CELL_Z_DEFAULT,
                 }}
               >
-                <HexClip
-                  width={2}
-                  color={isActive ? "#333333" : "#333333"}
-                />
+                <HexClip />
                 <div
                   style={{
                     position: "absolute",
