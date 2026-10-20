@@ -497,14 +497,9 @@ export default function HexagonsPage() {
   const denom = 1 + (columns - 1) * 0.75;
   const sceneWidth = hexWidth * denom;
   const viewportRows = Math.ceil(height / hexHeight) + 2;
-  const scrollScreens = 1;
   // At least 5 rows so authored cells through row 4 (e.g. "2-4") always print,
-  // even on short viewports where height-based count would drop them. 
-  /*
-  const totalScrollRows = Math.max(
-    5,
-    Math.ceil((height * scrollScreens) / hexHeight) + 2
-  ); */
+  // even on short viewports where height-based count would drop them.
+  // const totalScrollRows = Math.max(5, Math.ceil((height * 1) / hexHeight) + 2);
   const totalScrollRows = 5;
   const contentHeight = totalScrollRows * hexHeight + hexHeight;
   const nearThreshold = hexHeight * 0.25;
