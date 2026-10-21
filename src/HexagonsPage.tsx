@@ -415,8 +415,11 @@ const WIDE_SIDE_COLUMNS = 2;
 const HEX_SCALE_BREAKPOINT = 1400;
 /** Hex size multiplier when width is below HEX_SCALE_BREAKPOINT (1 = full size). */
 const HEX_SCALE_BELOW_BREAKPOINT = 0.7;
-/** Extra downward shift for hex layers on small phones (clears the title). */
-const HEX_LAYER_OFFSET_BELOW_600 = 90;
+/**
+ * Ultra-wide: at/above this width, hexes scale with the viewport so the honeycomb
+ * never leaves empty gutters (fixed-size scene is ~2250px with current columns).
+ */
+const HEX_FILL_BREAKPOINT = 2000;
 
 function shiftColKey(key: string, colShift: number): string {
   if (colShift === 0) return key;
@@ -482,20 +485,22 @@ export default function HexagonsPage() {
   const contentDenom = 1 + (CONTENT_COLUMNS - 1) * 0.75;
   const contentSceneWidth = contentLayoutWidth / (1 - 0.75 / contentDenom);
   // Narrow stays at 1 so the scene clips edge-to-edge; mid-width keeps 0.7.
+  // Ultra-wide grows with the viewport so side gutters never appear.
   const hexScale =
-    !isNarrow && width < HEX_SCALE_BREAKPOINT ? HEX_SCALE_BELOW_BREAKPOINT : 1;
+    !isNarrow && width < HEX_SCALE_BREAKPOINT
+      ? HEX_SCALE_BELOW_BREAKPOINT
+      : width >= HEX_FILL_BREAKPOINT
+        ? width / HEX_FILL_BREAKPOINT
+        : 1;
   const hexWidth = (contentSceneWidth / contentDenom) * hexScale;
   const hexHeight = hexWidth * 0.8660254;
   const denom = 1 + (columns - 1) * 0.75;
   const sceneWidth = hexWidth * denom;
   const viewportRows = Math.ceil(height / hexHeight) + 2;
-  const scrollScreens = 1;
   // At least 5 rows so authored cells through row 4 (e.g. "2-4") always print,
   // even on short viewports where height-based count would drop them.
-  const totalScrollRows = Math.max(
-    5,
-    Math.ceil((height * scrollScreens) / hexHeight) + 2
-  );
+  // const totalScrollRows = Math.max(5, Math.ceil((height * 1) / hexHeight) + 2);
+  const totalScrollRows = 5;
   const contentHeight = totalScrollRows * hexHeight + hexHeight;
   const nearThreshold = hexHeight * 0.25;
   /** How far from the trigger the tint starts rising (scroll-driven 0 → 1). */
@@ -1106,8 +1111,8 @@ export default function HexagonsPage() {
           zIndex: 8,
           // Tuck up to the even-column flats so the next section fills the zig-zag notches.
           marginTop: evenBottomY - hexSectionHeight,
-          paddingBottom: "160px",
-          minHeight: height,
+          paddingTop: hexHeight * 0.75,
+          paddingBottom: "90px",
           background:
             "linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 35%, transparent 70%)",
         }}
@@ -1147,11 +1152,14 @@ export default function HexagonsPage() {
               </li>
             </ul>
 
-            <p className="portfolio-p">
+            <p className="portfolio-p portfolio-small">
               I'd love to hear what you are doing.
             </p>
             <p className="portfolio-p">
               <a href="mailto:parameter64@proton.me">parameter64@proton.me</a>
+            </p>
+            <p className="portfolio-p">
+              <a href="tel:+46738790924">073 87 909 24</a>
             </p>
 
           </div>

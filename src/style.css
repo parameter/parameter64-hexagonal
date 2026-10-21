@@ -253,12 +253,8 @@ h1 {
 }
 
 .text-stuff-section {
-  position: absolute;
-  height: 100%;
-  top: 200px;
-  left: 50%;
-  transform: translateX(-50%);
-  right: 70px;
+  position: relative;
+  margin: 0 auto;
   color: #ffffff;
   width: 100%;
   max-width: 800px;
@@ -266,12 +262,6 @@ h1 {
 
 .text-stuff-section-inner {
   padding: 0 40px;
-}
-
-@media (max-width: 900px) {
-  .text-stuff-section {
-    top: 160px;
-  }
 }
 
 h1,h2,h3,h4,h5,h6,p,ul,ol,li,a {
@@ -300,10 +290,10 @@ h1,h2,h3,h4,h5,h6,p,ul,ol,li,a {
 
 .portfolio-p,
 .portfolio-list li a {
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.2;
-  padding: 10px 0 10px 0;
+  padding: 0 0 10px 0;
   color: #ffffff;
   margin: 0;
   line-height: 1.4;
@@ -311,6 +301,11 @@ h1,h2,h3,h4,h5,h6,p,ul,ol,li,a {
 
 .portfolio-list li section {
   margin: 0 0 40px 0;
+}
+
+
+.portfolio-small {
+  font-size: 17px;
 }
 
 
