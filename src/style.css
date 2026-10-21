@@ -252,10 +252,10 @@ h1,h2,h3,h4,h5,h6,p,ul,ol,li,a {
 
 .portfolio-p,
 .portfolio-list li a {
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.2;
-  padding: 10px 0 10px 0;
+  padding: 0 0 10px 0;
   color: #ffffff;
   margin: 0;
   line-height: 1.4;
@@ -263,6 +263,11 @@ h1,h2,h3,h4,h5,h6,p,ul,ol,li,a {
 
 .portfolio-list li section {
   margin: 0 0 40px 0;
+}
+
+
+.portfolio-small {
+  font-size: 17px;
 }
 
 

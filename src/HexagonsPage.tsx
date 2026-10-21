@@ -1126,7 +1126,7 @@ export default function HexagonsPage() {
           zIndex: 8,
           // Tuck up to the even-column flats so the next section fills the zig-zag notches.
           marginTop: evenBottomY - hexSectionHeight,
-          paddingTop: hexHeight * 0.65,
+          paddingTop: hexHeight * 0.75,
           paddingBottom: "90px",
           background:
             "linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 35%, transparent 70%)",
@@ -1167,11 +1167,14 @@ export default function HexagonsPage() {
               </li>
             </ul>
 
-            <p className="portfolio-p">
+            <p className="portfolio-p portfolio-small">
               I'd love to hear what you are doing.
             </p>
             <p className="portfolio-p">
               <a href="mailto:parameter64@proton.me">parameter64@proton.me</a>
+            </p>
+            <p className="portfolio-p">
+              <a href="tel:+46738790924">073 87 909 24</a>
             </p>
 
           </div>
