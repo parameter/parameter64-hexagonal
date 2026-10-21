@@ -35,7 +35,7 @@ body {
   place-items: center;
   margin: 0;
   padding: 10px 12px;
-  font-weight: 400;
+  font-weight: 600;
   letter-spacing: -0.2;
   text-align: center;
   font-size: 1em;
@@ -46,6 +46,17 @@ body {
 @media (max-width: 1400px) {
   .hex-headline {
     font-size: 0.9em;
+  }
+}
+
+@media (max-width: 600px) {
+  .hex-headline {
+    font-size: 0.75em;
+  }
+}
+@media (max-width: 400px) {
+  .hex-headline {
+    font-size: 0.5em;
   }
 }
 
@@ -67,9 +78,36 @@ h1 {
   font-family: c64;
 }
 
+.site-title {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.site-subtitle {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 17px;
+  font-weight: 400;
+  margin: 4px 0 0;
+}
+
+@media (max-width: 600px) {
+  .site-title {
+    font-size: 19px;
+  }
+  .site-subtitle {
+    font-size: 14px;
+  }
+}
+
 .hex-headline {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  font-weight: 400;
+}
+
+.hex-headline .hex-active-only {
+  margin: 6px 0 0 0;
 }
 
 .mono-font {

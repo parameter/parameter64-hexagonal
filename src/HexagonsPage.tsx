@@ -415,6 +415,8 @@ const WIDE_SIDE_COLUMNS = 2;
 const HEX_SCALE_BREAKPOINT = 1400;
 /** Hex size multiplier when width is below HEX_SCALE_BREAKPOINT (1 = full size). */
 const HEX_SCALE_BELOW_BREAKPOINT = 0.7;
+/** Extra downward shift for hex layers on small phones (clears the title). */
+const HEX_LAYER_OFFSET_BELOW_600 = 90;
 
 function shiftColKey(key: string, colShift: number): string {
   if (colShift === 0) return key;
@@ -502,6 +504,8 @@ export default function HexagonsPage() {
   // Center the (possibly wider) scene; side columns clip outside the viewport.
   const xOffset = (containerWidthPx - sceneWidth) / 2;
   const containerLeftPx = (width - containerWidthPx) / 2;
+  const hexLayerOffsetY = width < 600 ? HEX_LAYER_OFFSET_BELOW_600 : 0;
+  const hexLayerTop = -hexHeight + hexLayerOffsetY;
 
   // #2773F5
   // #A4ED11
@@ -822,7 +826,7 @@ export default function HexagonsPage() {
             data-hex-fixed-layer
             style={{
               position: "fixed",
-              top: -hexHeight,
+              top: hexLayerTop,
               left: containerLeftPx,
               // Use guarded layout height — not 100vh — so mobile chrome / DevTools
               // cannot retarget the fixed box independently of our geometry.
@@ -908,27 +912,10 @@ export default function HexagonsPage() {
                 pointerEvents: "none",
               }}
             >
-              <h1
-                className="c64-font"
-                style={{
-                  color: "#ffffff",
-                  fontSize: "24px",
-                  fontWeight: 600,
-                  letterSpacing: -0.2,
-                  margin: 0,
-                }}
-              >
+              <h1 className="c64-font site-title">
                 Par Henriksson
               </h1>
-              <p
-                className="mono-font"
-                style={{
-                  color: "rgba(255, 255, 255, 0.8)",
-                  fontSize: "17px",
-                  fontWeight: 400,
-                  margin: "4px 0 0",
-                }}
-              >
+              <p className="mono-font site-subtitle">
                 programmer, developer, builder
               </p>
             </div>,
@@ -980,7 +967,7 @@ export default function HexagonsPage() {
               position: "absolute",
               left: 0,
               width: containerWidthPx,
-              top: -hexHeight,
+              top: hexLayerTop,
               height: contentHeight + hexHeight,
             }}
           >
@@ -1010,7 +997,7 @@ export default function HexagonsPage() {
             position: "absolute",
             left: 0,
             width: containerWidthPx,
-            top: -hexHeight,
+            top: hexLayerTop,
             height: contentHeight + hexHeight,
             zIndex: 2,
           }}
