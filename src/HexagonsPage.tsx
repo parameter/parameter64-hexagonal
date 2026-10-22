@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import chainoutLogo from "./images/chainout-logo-4.svg";
 import bidstackerLogo from "./images/bidstacker.png";
 import parameter64Logo from "./images/parameter64.png";
+import { generateCvPdf } from "./generateCvPdf";
 
 /** Set to false (or open console and run `window.__HEX_DEBUG = false`) to silence. */
 const HEX_DEBUG = true;
@@ -61,6 +62,9 @@ type ScrollCellContentEntry = {
 };
 
 const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
+
+/** Extra hex-layer Y offset on narrow viewports (width < 600). */
+const HEX_LAYER_OFFSET_BELOW_600 = 0;
 
 /** First z-index assigned to a narrow cell; global counter increases from here. */
 const SCROLL_CELL_Z_BASE = 40;
@@ -1162,6 +1166,8 @@ export default function HexagonsPage() {
               <a href="tel:+46738790924">073 87 909 24</a>
             </p>
 
+            <CvDownloadSection />
+
           </div>
         
         </div>
@@ -1169,5 +1175,38 @@ export default function HexagonsPage() {
       </section>
       
     </div>
+  );
+}
+
+function CvDownloadSection() {
+  const [downloading, setDownloading] = React.useState(false);
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await generateCvPdf();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <section className="cv-download-section" aria-label="Curriculum vitae">
+      <h4 className="portfolio-subtitle italic orange-color">Curriculum vitae</h4>
+      <p className="portfolio-p portfolio-small">
+        Full experience, skills, and contact details as a PDF.
+      </p>
+      <button
+        type="button"
+        className="cv-download-btn"
+        onClick={handleDownload}
+        disabled={downloading}
+      >
+        {downloading ? "Generating PDF…" : "Download CV PDF"}
+      </button>
+    </section>
   );
 }
