@@ -65,7 +65,12 @@ h1 {
   line-height: 1.1;
 }
 
+/* Stacking context so in-tree content paints above the fixed hex backdrop
+   portal (body-level). Samsung Internet otherwise lets that fixed layer win
+   over section z-index and draws grid strokes on top of hexes/text. */
 #app {
+  position: relative;
+  z-index: 10;
   width: 100%;
   min-height: 100vh;
 }
@@ -194,6 +199,12 @@ h1 {
 
 .hex-headline img {
   margin: 0 0 4px 0;
+}
+
+/* Isolate so luminosity blends with the hex tint, not the page/backdrop.
+   Samsung Internet is especially sensitive to missing isolation here. */
+.hex-blend-root {
+  isolation: isolate;
 }
 
 .hex-img-luminosity {

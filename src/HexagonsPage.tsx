@@ -403,6 +403,22 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+/** Prefer alpha in the color over `opacity` — opacity+clip-path compositing is flaky on Samsung Internet. */
+function colorWithAlpha(color: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  if (a >= 1) return color;
+  if (a <= 0) return "transparent";
+  const hex = color.trim();
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!m) return color;
+  let h = m[1];
+  if (h.length === 3) h = [...h].map((c) => c + c).join("");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 function smoothstep01(n: number) {
   const t = clamp01(n);
   return t * t * (3 - 2 * t);
@@ -419,6 +435,8 @@ const WIDE_SIDE_COLUMNS = 2;
 const HEX_SCALE_BREAKPOINT = 1400;
 /** Hex size multiplier when width is below HEX_SCALE_BREAKPOINT (1 = full size). */
 const HEX_SCALE_BELOW_BREAKPOINT = 0.7;
+/** Hex size multiplier when width is at/below CONTENT_MAX_WIDTH (1 = full size). */
+const HEX_SCALE_BELOW_CONTENT_MAX = 1.2;
 /**
  * Ultra-wide: at/above this width, hexes scale with the viewport so the honeycomb
  * never leaves empty gutters (fixed-size scene is ~2250px with current columns).
@@ -488,10 +506,11 @@ export default function HexagonsPage() {
   const contentLayoutWidth = Math.min(width, CONTENT_MAX_WIDTH);
   const contentDenom = 1 + (CONTENT_COLUMNS - 1) * 0.75;
   const contentSceneWidth = contentLayoutWidth / (1 - 0.75 / contentDenom);
-  // Narrow stays at 1 so the scene clips edge-to-edge; mid-width keeps 0.7.
+  // Narrow uses HEX_SCALE_BELOW_CONTENT_MAX; mid-width keeps 0.7.
   // Ultra-wide grows with the viewport so side gutters never appear.
-  const hexScale =
-    !isNarrow && width < HEX_SCALE_BREAKPOINT
+  const hexScale = isNarrow
+    ? HEX_SCALE_BELOW_CONTENT_MAX
+    : width < HEX_SCALE_BREAKPOINT
       ? HEX_SCALE_BELOW_BREAKPOINT
       : width >= HEX_FILL_BREAKPOINT
         ? width / HEX_FILL_BREAKPOINT
@@ -843,7 +862,9 @@ export default function HexagonsPage() {
               pointerEvents: "none",
               width: containerWidthPx,
               overflow: "hidden",
-              zIndex: 5,
+              // Must stay below #app (z-index: 10). Higher values let Samsung
+              // Internet paint this grid over scrolling hexes and body copy.
+              zIndex: 1,
               background: "#363636",
             }}
           >
@@ -898,14 +919,16 @@ export default function HexagonsPage() {
       : null;
 
   return (
-    <div
+      <div
       style={{
         position: "relative",
         width: containerWidthPx,
         margin: "0 auto",
         // Do not set overflow-x here: it makes descendants' position:fixed
         // scroll with this box in Chromium. Horizontal clip lives on body.
-        background: "#2B2B2B",
+        // Transparent so the fixed hex backdrop (z-index: 1) shows through
+        // empty cells and below the text section; fills live on hex cells.
+        background: "transparent",
       }}
     >
       {fixedHexLayer}
@@ -1065,6 +1088,7 @@ export default function HexagonsPage() {
               >
                 <HexClip />
                 <div
+                  className={hasTint ? "hex-blend-root" : undefined}
                   style={{
                     position: "absolute",
                     inset: 0,
@@ -1072,19 +1096,18 @@ export default function HexagonsPage() {
                     WebkitClipPath: HEX_CLIP,
                     display: "grid",
                     placeItems: "center",
+                    // Opaque local base so grid strokes never show through clip seams.
+                    background: isEmptyCell ? "transparent" : "#2B2B2B",
                   }}
                 >
-                  {/* Colored tint only — grey base comes from the backdrop (emptyCells = holes). */}
+                  {/* Colored tint — alpha in the color avoids opacity+clip-path bugs. */}
                   {hasTint && !isEmptyCell ? (
                     <div
                       aria-hidden
                       style={{
                         position: "absolute",
                         inset: 0,
-                        clipPath: HEX_CLIP,
-                        WebkitClipPath: HEX_CLIP,
-                        background: entry!.background,
-                        opacity: tintOpacity,
+                        background: colorWithAlpha(entry!.background!, tintOpacity),
                         pointerEvents: "none",
                       }}
                     />
