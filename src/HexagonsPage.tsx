@@ -64,7 +64,7 @@ type ScrollCellContentEntry = {
 const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
 
 /** Extra hex-layer Y offset on narrow viewports (width < 600). */
-const HEX_LAYER_OFFSET_BELOW_600 = 80;
+const HEX_LAYER_OFFSET_BELOW_600 = 50;
 
 /** First z-index assigned to a narrow cell; global counter increases from here. */
 const SCROLL_CELL_Z_BASE = 40;
