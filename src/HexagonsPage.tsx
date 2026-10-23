@@ -64,7 +64,7 @@ type ScrollCellContentEntry = {
 const HEX_CLIP = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
 
 /** Extra hex-layer Y offset on narrow viewports (width < 600). */
-const HEX_LAYER_OFFSET_BELOW_600 = 0;
+const HEX_LAYER_OFFSET_BELOW_600 = 130;
 
 /** First z-index assigned to a narrow cell; global counter increases from here. */
 const SCROLL_CELL_Z_BASE = 40;
@@ -532,7 +532,7 @@ export default function HexagonsPage() {
   // Center the (possibly wider) scene; side columns clip outside the viewport.
   const xOffset = (containerWidthPx - sceneWidth) / 2;
   const containerLeftPx = (width - containerWidthPx) / 2;
-  const hexLayerOffsetY = width < 600 ? HEX_LAYER_OFFSET_BELOW_600 : 0;
+  const hexLayerOffsetY = width < 700 ? HEX_LAYER_OFFSET_BELOW_600 : 0;
   const hexLayerTop = -hexHeight + hexLayerOffsetY;
 
   // #2773F5
@@ -824,6 +824,8 @@ export default function HexagonsPage() {
   ]);
 
   // Clip along the last row's hex bottoms (same shape as HEX_CLIP).
+  // Include hexLayerOffsetY so the zig-zag, section height, and Next section
+  // tuck all track HEX_LAYER_OFFSET_BELOW_600 with the hex layers.
   const clipRow = totalScrollRows - 1;
   const bottomEdge = hexRowBottomEdge(
     columns,
@@ -832,9 +834,9 @@ export default function HexagonsPage() {
     xOffset,
     clipRow,
     containerWidthPx
-  );
-  const oddBottomY = clipRow * hexHeight + hexHeight / 2;
-  const evenBottomY = clipRow * hexHeight;
+  ).map((p) => ({ x: p.x, y: p.y + hexLayerOffsetY }));
+  const oddBottomY = clipRow * hexHeight + hexHeight / 2 + hexLayerOffsetY;
+  const evenBottomY = clipRow * hexHeight + hexLayerOffsetY;
   const hexSectionHeight = oddBottomY;
   // Clip coords match the section box (y = 0 at section top).
   const hexSectionClip = polygonClip([
