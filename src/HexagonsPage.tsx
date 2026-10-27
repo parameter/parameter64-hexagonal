@@ -1087,6 +1087,10 @@ export default function HexagonsPage() {
                   top: cell.top,
                   width: hexWidth,
                   height: hexHeight,
+                  transform: entry
+                    ? `scale(${1 + 0.2 * contentProgress})`
+                    : undefined,
+                  transformOrigin: "center",
                   // Content cells bump z on activation so the newest active hex stacks on top.
                   zIndex: key in activeCellContent
                     ? (scrollCellZByKey[key] ?? SCROLL_CELL_Z_BASE)
