@@ -959,6 +959,25 @@ export default function HexagonsPage() {
       {typeof document !== "undefined"
         ? createPortal(
             <div
+              aria-hidden
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: "110px",
+                zIndex: 50,
+                pointerEvents: "none",
+                background:
+                  "linear-gradient(to bottom, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.18) 55%, transparent 100%)",
+              }}
+            />,
+            document.body
+          )
+        : null}
+      {typeof document !== "undefined"
+        ? createPortal(
+            <div
               style={{
                 position: "fixed",
                 top: "12px",
