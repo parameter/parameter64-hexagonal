@@ -614,9 +614,8 @@ export default function HexagonsPage() {
       content: <>
       <img style={{ width: "100%", maxWidth: "70%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />
       <div style={{ color: "#385105" }} className="hex-active-only">
-        web, applications and   
-        <br />
-        everything since 2010
+        web, applications <br />and   
+        everything <br />since 2010
       </div>
       </>,
       background: "#A4ED11",
