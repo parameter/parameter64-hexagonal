@@ -1003,7 +1003,7 @@ export default function HexagonsPage() {
               className="mono-font open-chip"
               style={{
                 position: "fixed",
-                top: "13px",
+                top: "19px",
                 right: "24px",
                 zIndex: 100,
                 pointerEvents: "none",
