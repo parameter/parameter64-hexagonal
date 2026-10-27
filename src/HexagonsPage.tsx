@@ -403,6 +403,11 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+/** Samsung Internet (esp. Exynos A-series) mishandles body-level fixed stacks + mix-blend. */
+function isSamsungBrowser() {
+  return typeof navigator !== "undefined" && /SamsungBrowser/i.test(navigator.userAgent);
+}
+
 /** Prefer alpha in the color over `opacity` — opacity+clip-path compositing is flaky on Samsung Internet. */
 function colorWithAlpha(color: string, alpha: number): string {
   const a = Math.max(0, Math.min(1, alpha));
@@ -513,6 +518,8 @@ function activationDirectionalOpacity(
 export default function HexagonsPage() {
   const { width, height } = useViewport();
   const scrollY = useScrollY();
+  // Skip luminosity on Samsung — blend often samples the fixed grid instead of the hex tint.
+  const useLuminosityBlend = React.useMemo(() => !isSamsungBrowser(), []);
 
   const isNarrow = width <= CONTENT_MAX_WIDTH;
   // Hex size from the 4-col content band, capped at CONTENT_MAX_WIDTH so wide
@@ -554,7 +561,6 @@ export default function HexagonsPage() {
   const containerWidthPx = width;
   // Center the (possibly wider) scene; side columns clip outside the viewport.
   const xOffset = (containerWidthPx - sceneWidth) / 2;
-  const containerLeftPx = (width - containerWidthPx) / 2;
   const hexLayerOffsetY = width < 700 ? HEX_LAYER_OFFSET_BELOW_600 : 0;
   const hexLayerTop = -hexHeight + hexLayerOffsetY;
 
@@ -567,19 +573,18 @@ export default function HexagonsPage() {
     "1-2": {
       trigger: "1-1",
       inactiveContent: <img style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={bidstackerLogo} alt="Bidstacker AB" />,
-      content: <>
-        <img style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={bidstackerLogo} alt="Bidstacker AB" />
+      content: (
         <div style={{ color: "#453300" }} className="hex-active-only">
           Architecture <br />and backend for<br /> mobile app.
         </div>
-      </>,
+      ),
       background: "#FFBF00",
     },
     "2-2": {
       trigger: "2-2",
       inactiveContent: (
         <img
-          className="hex-img-luminosity"
+          className={useLuminosityBlend ? "hex-img-luminosity" : undefined}
           style={{ width: "100%", maxWidth: "25%" }}
           width="auto"
           height="auto"
@@ -588,36 +593,25 @@ export default function HexagonsPage() {
         />
       ),
       content: (
-        <>
-          <img
-            className="hex-img-luminosity"
-            style={{ width: "100%", maxWidth: "25%" }}
-            width="auto"
-            height="auto"
-            src={chainoutLogo}
-            alt="ChainOut App"
-          />
-          <div className="hex-active-only">
-            ChainOut
-            <br />
-            gamified discgolf
-            <br />
-            scoring app
-          </div>
-        </>
+        <div className="hex-active-only">
+          ChainOut
+          <br />
+          gamified discgolf
+          <br />
+          scoring app
+        </div>
       ),
       background: "#2773F5",
     },
     "2-4": {
       trigger: "2-2",
       inactiveContent: <img style={{ width: "100%", maxWidth: "70%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />,
-      content: <>
-      <img style={{ width: "100%", maxWidth: "70%" }} width="auto" height="auto" src={parameter64Logo} alt="Parameter64, Pär Henriksson" />
-      <div style={{ color: "#385105" }} className="hex-active-only">
-        web, applications <br />and   
-        everything <br />since 2010
-      </div>
-      </>,
+      content: (
+        <div style={{ color: "#385105" }} className="hex-active-only">
+          web, applications <br />and
+          everything <br />since 2010
+        </div>
+      ),
       background: "#A4ED11",
     },
   };
@@ -867,80 +861,72 @@ export default function HexagonsPage() {
     ...[...bottomEdge].reverse(),
   ]);
 
-  // Portal keeps the backdrop on the viewport. A parent with overflow-x (even
-  // "hidden") can turn position:fixed into a scroll-relative containing block,
-  // which is what made this layer drift upward while scrolling.
-  const fixedHexLayer =
-    typeof document !== "undefined"
-      ? createPortal(
+  // In-tree position:fixed (not a body portal). Samsung Internet was promoting
+  // body-level fixed SVG strokes above #app content; under #app the grid stays
+  // behind scrolling hexes. Do not add overflow/transform on ancestors of this node.
+  const fixedHexLayer = (
+    <div
+      aria-hidden
+      data-hex-fixed-layer
+      style={{
+        position: "fixed",
+        top: hexLayerTop,
+        left: 0,
+        // Use guarded layout height — not 100vh — so mobile chrome / DevTools
+        // cannot retarget the fixed box independently of our geometry.
+        height: height + hexHeight,
+        pointerEvents: "none",
+        width: containerWidthPx,
+        overflow: "hidden",
+        zIndex: 0,
+        background: "#363636",
+      }}
+    >
+      {fixedCells.map((cell) => {
+        const key = `${cell.col}-${cell.row}`;
+        const isFixedContentMarker = key in activeFixedCellContent;
+        const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
+        return (
           <div
-            aria-hidden
-            data-hex-fixed-layer
+            key={`fixed-${cell.index}`}
+            data-fixed-marker={isFixedContentMarker ? key : undefined}
             style={{
-              position: "fixed",
-              top: hexLayerTop,
-              left: containerLeftPx,
-              // Use guarded layout height — not 100vh — so mobile chrome / DevTools
-              // cannot retarget the fixed box independently of our geometry.
-              height: height + hexHeight,
-              pointerEvents: "none",
-              width: containerWidthPx,
-              overflow: "hidden",
-              // Must stay below #app (z-index: 10). Higher values let Samsung
-              // Internet paint this grid over scrolling hexes and body copy.
-              zIndex: 1,
-              background: "#363636",
+              position: "absolute",
+              left: cell.left,
+              top: cell.top,
+              width: hexWidth,
+              height: hexHeight,
+              zIndex: 2,
+              isolation: isFixedContentMarker ? "isolate" : undefined,
+              transition: "background 140ms linear, box-shadow 140ms linear",
             }}
           >
-            {fixedCells.map((cell) => {
-              const key = `${cell.col}-${cell.row}`;
-              const isFixedContentMarker = key in activeFixedCellContent;
-              const markerLabel = isFixedContentMarker ? activeFixedCellContent[key] : "";
-              return (
-                <div
-                  key={`fixed-${cell.index}`}
-                  data-fixed-marker={isFixedContentMarker ? key : undefined}
-                  style={{
-                    position: "absolute",
-                    left: cell.left,
-                    top: cell.top,
-                    width: hexWidth,
-                    height: hexHeight,
-                    zIndex: 2,
-                    isolation: isFixedContentMarker ? "isolate" : undefined,
-                    transition: "background 140ms linear, box-shadow 140ms linear",
-                  }}
-                >
-                  {
-                    <HexClipStroke
-                      width={1}
-                      color={anyHexActive ? "#2e2e2e" : "#313131"}
-                    />
-                  }
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      clipPath: HEX_CLIP,
-                      WebkitClipPath: HEX_CLIP,
-                      display: "grid",
-                      placeItems: "center",
-                    }}
-                  >
-                    {isFixedContentMarker ? (
-                      <span style={FIXED_MARKER_LABEL} title={`${key} — ${markerLabel}`}>
-                        <span style={FIXED_MARKER_KEY}></span>
-                        <span style={FIXED_MARKER_TEXT}></span>
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>,
-          document.body
-        )
-      : null;
+            <HexClipStroke
+              width={1}
+              color={anyHexActive ? "#2e2e2e" : "#313131"}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                clipPath: HEX_CLIP,
+                WebkitClipPath: HEX_CLIP,
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              {isFixedContentMarker ? (
+                <span style={FIXED_MARKER_LABEL} title={`${key} — ${markerLabel}`}>
+                  <span style={FIXED_MARKER_KEY}></span>
+                  <span style={FIXED_MARKER_TEXT}></span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
       <div
@@ -948,10 +934,8 @@ export default function HexagonsPage() {
         position: "relative",
         width: containerWidthPx,
         margin: "0 auto",
-        // Do not set overflow-x here: it makes descendants' position:fixed
-        // scroll with this box in Chromium. Horizontal clip lives on body.
-        // Transparent so the fixed hex backdrop (z-index: 1) shows through
-        // empty cells and below the text section; fills live on hex cells.
+        // Do not set overflow/transform here: either makes position:fixed on the
+        // hex backdrop scroll with this box. Horizontal clip lives on body.
         background: "transparent",
       }}
     >
@@ -1023,7 +1007,9 @@ export default function HexagonsPage() {
           position: "relative",
           height: hexSectionHeight,
           zIndex: 10,
-          overflow: "hidden"
+          overflow: "hidden",
+          // Own compositor layer so Samsung cannot interleave fixed-grid SVG strokes.
+          transform: "translateZ(0)",
         }}
       >
         {/* Grey hex backdrop with zig-zag bottom; skips emptyCells so those stay true holes. */}
@@ -1075,6 +1061,7 @@ export default function HexagonsPage() {
             top: hexLayerTop,
             height: contentHeight + hexHeight,
             zIndex: 2,
+            transform: "translateZ(0)",
           }}
         >
           {scrollingCells.map((cell) => {
@@ -1180,6 +1167,8 @@ export default function HexagonsPage() {
                       style={
                         {
                           "--hex-activation": contentProgress,
+                          "--hex-inactive-opacity": 1 - contentProgress,
+                          "--hex-active-opacity": contentProgress,
                         } as React.CSSProperties
                       }
                     >
@@ -1207,6 +1196,7 @@ export default function HexagonsPage() {
           marginTop: evenBottomY - hexSectionHeight,
           paddingTop: hexHeight * 0.75,
           paddingBottom: "90px",
+          transform: "translateZ(0)",
           background:
             "linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 35%, transparent 70%)",
         }}

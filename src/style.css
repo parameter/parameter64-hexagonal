@@ -63,14 +63,15 @@ h1 {
   line-height: 1.1;
 }
 
-/* Stacking context so in-tree content paints above the fixed hex backdrop
-   portal (body-level). Samsung Internet otherwise lets that fixed layer win
-   over section z-index and draws grid strokes on top of hexes/text. */
+/* Stacking context for page content. Hex grid backdrop is position:fixed but
+   in-tree under #app (not a body portal) so Samsung Internet cannot promote SVG
+   strokes above the scrolling hex fills. */
 #app {
   position: relative;
   z-index: 10;
   width: 100%;
   min-height: 100vh;
+  isolation: isolate;
 }
 
 .scroll-cell {
@@ -201,16 +202,18 @@ h1 {
 }
 
 /* Isolate so luminosity blends with the hex tint, not the page/backdrop.
-   Samsung Internet is especially sensitive to missing isolation here. */
+   translateZ keeps a stable compositor layer on Samsung Internet / Exynos. */
 .hex-blend-root {
   isolation: isolate;
+  transform: translateZ(0);
 }
 
 .hex-img-luminosity {
   mix-blend-mode: luminosity;
 }
 
-/* Stack layers; fade/move children (not wrappers) so img mix-blend-mode still hits the tint. */
+/* Stack layers; fade/move children (not wrappers) so img mix-blend-mode still hits the tint.
+   Prefer numeric custom props — Samsung is flaky with calc() around opacity. */
 .hex-inactive-content,
 .hex-active-content {
   grid-area: 1 / 1;
@@ -221,24 +224,34 @@ h1 {
 }
 
 .hex-inactive-content > * {
-  opacity: calc(1 - var(--hex-activation));
+  opacity: var(--hex-inactive-opacity, 1);
 }
 
 .hex-active-content > * {
-  opacity: var(--hex-activation);
+  opacity: var(--hex-active-opacity, 0);
 }
 
-/* Logo rises with the text slot (~half of 3-line block) so it eases with scroll. */
+/* Shared logo in inactive + text-only active: column layout, one logo, text fades in. */
 .hex-headline:has(.hex-active-only) {
-  --hex-img-rise: 1.85em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hex-headline:has(.hex-active-only) .hex-inactive-content,
+.hex-headline:has(.hex-active-only) .hex-active-content {
+  grid-area: unset;
 }
 
 .hex-headline:has(.hex-active-only) .hex-inactive-content > img {
-  transform: translateY(calc(var(--hex-activation) * -1 * var(--hex-img-rise)));
+  opacity: 1;
 }
 
-.hex-headline:has(.hex-active-only) .hex-active-content > img {
-  transform: translateY(calc((1 - var(--hex-activation)) * var(--hex-img-rise)));
+/* Collapse text while inactive so the logo stays centered alone. */
+.hex-headline:has(.hex-active-only) .hex-active-content {
+  max-height: calc(var(--hex-activation) * 5em);
+  overflow: hidden;
 }
 
 .hex-headline.is-active .hex-inactive-content {
