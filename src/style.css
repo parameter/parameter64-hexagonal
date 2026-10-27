@@ -201,11 +201,10 @@ h1 {
   margin: 0;
 }
 
-/* Isolate so luminosity blends with the hex tint, not the page/backdrop.
-   translateZ keeps a stable compositor layer on Samsung Internet / Exynos. */
+/* Isolate so luminosity blends with the hex fill, not the page/backdrop.
+   Only applied when luminosity blend is enabled (skipped on Samsung Internet). */
 .hex-blend-root {
   isolation: isolate;
-  transform: translateZ(0);
 }
 
 .hex-img-luminosity {

@@ -408,20 +408,33 @@ function isSamsungBrowser() {
   return typeof navigator !== "undefined" && /SamsungBrowser/i.test(navigator.userAgent);
 }
 
-/** Prefer alpha in the color over `opacity` — opacity+clip-path compositing is flaky on Samsung Internet. */
-function colorWithAlpha(color: string, alpha: number): string {
-  const a = Math.max(0, Math.min(1, alpha));
-  if (a >= 1) return color;
-  if (a <= 0) return "transparent";
-  const hex = color.trim();
-  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
-  if (!m) return color;
+/** Base grey for content hexes (must stay opaque — translucent tints go black on Samsung). */
+const HEX_CELL_GREY = "#2B2B2B";
+
+function parseHexRgb(color: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return null;
   let h = m[1];
   if (h.length === 3) h = [...h].map((c) => c + c).join("");
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+/** Opaque grey→tint mix. Avoids rgba overlays that Samsung composites as dark mud. */
+function mixHexColors(from: string, to: string, t: number): string {
+  const amount = clamp01(t);
+  if (amount <= 0) return from;
+  if (amount >= 1) return to;
+  const a = parseHexRgb(from);
+  const b = parseHexRgb(to);
+  if (!a || !b) return amount < 0.5 ? from : to;
+  const r = Math.round(a[0] + (b[0] - a[0]) * amount);
+  const g = Math.round(a[1] + (b[1] - a[1]) * amount);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * amount);
+  return `rgb(${r}, ${g}, ${bl})`;
 }
 
 function smoothstep01(n: number) {
@@ -1008,8 +1021,6 @@ export default function HexagonsPage() {
           height: hexSectionHeight,
           zIndex: 10,
           overflow: "hidden",
-          // Own compositor layer so Samsung cannot interleave fixed-grid SVG strokes.
-          transform: "translateZ(0)",
         }}
       >
         {/* Grey hex backdrop with zig-zag bottom; skips emptyCells so those stay true holes. */}
@@ -1046,7 +1057,7 @@ export default function HexagonsPage() {
                     height: hexHeight,
                     clipPath: HEX_CLIP,
                     WebkitClipPath: HEX_CLIP,
-                    background: "#2B2B2B",
+                    background: HEX_CELL_GREY,
                   }}
                 />
               );
@@ -1061,7 +1072,6 @@ export default function HexagonsPage() {
             top: hexLayerTop,
             height: contentHeight + hexHeight,
             zIndex: 2,
-            transform: "translateZ(0)",
           }}
         >
           {scrollingCells.map((cell) => {
@@ -1137,7 +1147,9 @@ export default function HexagonsPage() {
               >
                 <HexClip />
                 <div
-                  className={hasTint ? "hex-blend-root" : undefined}
+                  className={
+                    hasTint && useLuminosityBlend ? "hex-blend-root" : undefined
+                  }
                   style={{
                     position: "absolute",
                     inset: 0,
@@ -1145,22 +1157,15 @@ export default function HexagonsPage() {
                     WebkitClipPath: HEX_CLIP,
                     display: "grid",
                     placeItems: "center",
-                    // Opaque local base so grid strokes never show through clip seams.
-                    background: isEmptyCell ? "transparent" : "#2B2B2B",
+                    // Single opaque fill (grey → brand). No rgba overlay — that
+                    // composites to dark mud on Samsung Internet / Exynos.
+                    background: isEmptyCell
+                      ? "transparent"
+                      : hasTint
+                        ? mixHexColors(HEX_CELL_GREY, entry!.background!, tintOpacity)
+                        : HEX_CELL_GREY,
                   }}
                 >
-                  {/* Colored tint — alpha in the color avoids opacity+clip-path bugs. */}
-                  {hasTint && !isEmptyCell ? (
-                    <div
-                      aria-hidden
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: colorWithAlpha(entry!.background!, tintOpacity),
-                        pointerEvents: "none",
-                      }}
-                    />
-                  ) : null}
                   {entry ? (
                     <h2
                       className={`hex-headline${isActive ? " is-active" : ""}`}
@@ -1196,7 +1201,6 @@ export default function HexagonsPage() {
           marginTop: evenBottomY - hexSectionHeight,
           paddingTop: hexHeight * 0.75,
           paddingBottom: "90px",
-          transform: "translateZ(0)",
           background:
             "linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 35%, transparent 70%)",
         }}
