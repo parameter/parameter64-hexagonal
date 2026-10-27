@@ -493,6 +493,23 @@ function activationApproachOpacity(
   return smoothstep01(1 - (dist - nearThreshold) / (fadeRange - nearThreshold));
 }
 
+/**
+ * Like activationApproachOpacity, but different fade distances below vs above the
+ * trigger. screenTop > fixedTop → still below (approach / scale-up side);
+ * screenTop < fixedTop → past the trigger (leave / scale-down side).
+ */
+function activationDirectionalOpacity(
+  screenTop: number,
+  fixedTop: number,
+  nearThreshold: number,
+  fadeBelow: number,
+  fadeAbove: number
+): number {
+  const delta = screenTop - fixedTop;
+  const fadeRange = delta >= 0 ? fadeBelow : fadeAbove;
+  return activationApproachOpacity(screenTop, fixedTop, nearThreshold, fadeRange);
+}
+
 export default function HexagonsPage() {
   const { width, height } = useViewport();
   const scrollY = useScrollY();
@@ -530,6 +547,10 @@ export default function HexagonsPage() {
   const activationFadeRange = height * 0.75;
   /** Tighter band for inactive→active content crossfade (logo/text). */
   const contentFadeRange = hexHeight * 0.7;
+  /** Scale grows over this distance while approaching from below. */
+  const scaleUpFadeRange = contentFadeRange;
+  /** Scale shrinks over a shorter distance after passing the trigger. */
+  const scaleDownFadeRange = hexHeight * 0.5;
   const containerWidthPx = width;
   // Center the (possibly wider) scene; side columns clip outside the viewport.
   const xOffset = (containerWidthPx - sceneWidth) / 2;
@@ -1049,6 +1070,7 @@ export default function HexagonsPage() {
             // start as logo-only and only fade in active copy near the trigger.
             let tintOpacity = hasTint ? 0 : 1;
             let contentProgress = 0;
+            let scaleProgress = 0;
             if (entry) {
               const trigger = entry.trigger.trim();
               if (trigger && trigger in activeFixedCellContent) {
@@ -1073,6 +1095,13 @@ export default function HexagonsPage() {
                     nearThreshold,
                     contentFadeRange
                   );
+                  scaleProgress = activationDirectionalOpacity(
+                    approachTop,
+                    fixedTop,
+                    nearThreshold,
+                    scaleUpFadeRange,
+                    scaleDownFadeRange
+                  );
                 }
               }
             }
@@ -1088,12 +1117,14 @@ export default function HexagonsPage() {
                   width: hexWidth,
                   height: hexHeight,
                   transform: entry
-                    ? `scale(${1 + 0.2 * contentProgress})`
+                    ? `scale(${1 + 0.2 * scaleProgress})`
                     : undefined,
                   transformOrigin: "center",
-                  // Content cells bump z on activation so the newest active hex stacks on top.
+                  // Content cells bump z on activation; progress boost keeps the
+                  // more-activated (larger) hex above neighbors it briefly covers.
                   zIndex: key in activeCellContent
-                    ? (scrollCellZByKey[key] ?? SCROLL_CELL_Z_BASE)
+                    ? (scrollCellZByKey[key] ?? SCROLL_CELL_Z_BASE) +
+                      Math.round(scaleProgress * 20)
                     : entry
                       ? SCROLL_CELL_Z_WIDE
                       : SCROLL_CELL_Z_DEFAULT,

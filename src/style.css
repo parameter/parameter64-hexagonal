@@ -74,7 +74,8 @@ h1 {
 }
 
 .scroll-cell {
-  transition: transform 0.3s ease, background 140ms linear, border-color 140ms linear, box-shadow 140ms linear;
+  /* Transform is scroll-driven each frame — do not transition it. */
+  transition: background 140ms linear, border-color 140ms linear, box-shadow 140ms linear;
 }
 
 .c64-font {
