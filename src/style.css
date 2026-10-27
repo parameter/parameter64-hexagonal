@@ -30,6 +30,8 @@ body {
 }
 
 .hex-headline {
+  /* Scroll-driven 0→1; set inline from approach distance to the trigger. */
+  --hex-activation: 0;
   position: relative;
   display: grid;
   place-items: center;
@@ -217,46 +219,29 @@ h1 {
   justify-content: center;
 }
 
-.hex-inactive-content > *,
-.hex-active-content > * {
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-
 .hex-inactive-content > * {
-  opacity: 1;
+  opacity: calc(1 - var(--hex-activation));
 }
 
 .hex-active-content > * {
-  opacity: 0;
+  opacity: var(--hex-activation);
 }
 
-/* Logo rises with the text slot (~half of 3-line block) so it eases instead of snapping. */
+/* Logo rises with the text slot (~half of 3-line block) so it eases with scroll. */
 .hex-headline:has(.hex-active-only) {
   --hex-img-rise: 1.85em;
 }
 
+.hex-headline:has(.hex-active-only) .hex-inactive-content > img {
+  transform: translateY(calc(var(--hex-activation) * -1 * var(--hex-img-rise)));
+}
+
 .hex-headline:has(.hex-active-only) .hex-active-content > img {
-  transform: translateY(var(--hex-img-rise));
-}
-
-.hex-headline:has(.hex-active-only).is-active .hex-inactive-content > img {
-  transform: translateY(calc(-1 * var(--hex-img-rise)));
-}
-
-.hex-headline:has(.hex-active-only).is-active .hex-active-content > img {
-  transform: translateY(0);
+  transform: translateY(calc((1 - var(--hex-activation)) * var(--hex-img-rise)));
 }
 
 .hex-headline.is-active .hex-inactive-content {
   pointer-events: none;
-}
-
-.hex-headline.is-active .hex-inactive-content > * {
-  opacity: 0;
-}
-
-.hex-headline.is-active .hex-active-content > * {
-  opacity: 1;
 }
 
 .text-stuff-section {

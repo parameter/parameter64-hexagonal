@@ -528,6 +528,8 @@ export default function HexagonsPage() {
   const nearThreshold = hexHeight * 0.25;
   /** How far from the trigger the tint starts rising (scroll-driven 0 → 1). */
   const activationFadeRange = height * 0.75;
+  /** Tighter band for inactive→active content crossfade (logo/text). */
+  const contentFadeRange = hexHeight * 0.7;
   const containerWidthPx = width;
   // Center the (possibly wider) scene; side columns clip outside the viewport.
   const xOffset = (containerWidthPx - sceneWidth) / 2;
@@ -1043,8 +1045,11 @@ export default function HexagonsPage() {
             const isActive = !!entry && overlapState.activeScrollKeys.has(key);
             const hasTint = Boolean(entry?.background);
             // Same coordinate space as overlapState (cell.top - scrollY vs fixedTop).
-            let tintOpacity = 1;
-            if (hasTint && entry) {
+            // Tint uses a wide approach; content crossfade stays tight so cells
+            // start as logo-only and only fade in active copy near the trigger.
+            let tintOpacity = hasTint ? 0 : 1;
+            let contentProgress = 0;
+            if (entry) {
               const trigger = entry.trigger.trim();
               if (trigger && trigger in activeFixedCellContent) {
                 const [fixedColStr, fixedRowStr] = trigger.split("-");
@@ -1054,17 +1059,21 @@ export default function HexagonsPage() {
                   const colOffset = fixedCol % 2 ? hexHeight / 2 : 0;
                   const fixedTop = fixedRow * hexHeight + colOffset;
                   const approachTop = cell.top - scrollY;
-                  tintOpacity = activationApproachOpacity(
+                  if (hasTint) {
+                    tintOpacity = activationApproachOpacity(
+                      approachTop,
+                      fixedTop,
+                      nearThreshold,
+                      activationFadeRange
+                    );
+                  }
+                  contentProgress = activationApproachOpacity(
                     approachTop,
                     fixedTop,
                     nearThreshold,
-                    activationFadeRange
+                    contentFadeRange
                   );
-                } else {
-                  tintOpacity = 0;
                 }
-              } else {
-                tintOpacity = 0;
               }
             }
 
@@ -1078,8 +1087,6 @@ export default function HexagonsPage() {
                   top: cell.top,
                   width: hexWidth,
                   height: hexHeight,
-                  transform: isActive ? "scale(1.2)" : "scale(1)",
-                  transformOrigin: "center",
                   // Content cells bump z on activation so the newest active hex stacks on top.
                   zIndex: key in activeCellContent
                     ? (scrollCellZByKey[key] ?? SCROLL_CELL_Z_BASE)
@@ -1117,6 +1124,11 @@ export default function HexagonsPage() {
                   {entry ? (
                     <h2
                       className={`hex-headline${isActive ? " is-active" : ""}`}
+                      style={
+                        {
+                          "--hex-activation": contentProgress,
+                        } as React.CSSProperties
+                      }
                     >
                       <div className="hex-inactive-content">
                         {entry.inactiveContent}
