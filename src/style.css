@@ -63,15 +63,12 @@ h1 {
   line-height: 1.1;
 }
 
-/* Stacking context for page content. Hex grid backdrop is position:fixed but
-   in-tree under #app (not a body portal) so Samsung Internet cannot promote SVG
-   strokes above the scrolling hex fills. */
+/* Stacking context for page content above fixed chrome portals. */
 #app {
   position: relative;
   z-index: 10;
   width: 100%;
   min-height: 100vh;
-  isolation: isolate;
 }
 
 .scroll-cell {
