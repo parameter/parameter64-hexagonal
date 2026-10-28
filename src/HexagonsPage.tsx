@@ -674,7 +674,7 @@ export default function HexagonsPage() {
       inactiveContent: <img style={{ width: "100%", maxWidth: "75%" }} width="auto" height="auto" src={bidstackerLogo} alt="Bidstacker AB" />,
       content: (
         <div style={{ color: "#453300" }} className="hex-active-only">
-          Architecture <br />and backend for<br /> mobile app.
+          Procurement platform <br />for contractors <br /> and suppliers.
         </div>
       ),
       background: "#FFBF00",
