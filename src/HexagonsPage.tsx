@@ -11,6 +11,8 @@ const HEX_DEBUG = true;
 declare global {
   interface Window {
     __HEX_DEBUG?: boolean;
+    /** Set true in console to force the Samsung paint path on any browser. */
+    __HEX_FORCE_SAMSUNG?: boolean;
   }
 }
 
@@ -128,7 +130,14 @@ function HexClip() {
 }
 
 /** Opaque hex via SVG — avoids background+clip-path darkening on Samsung Internet. */
-function HexFill({ color }: { color: string }) {
+function HexFill({
+  color,
+  forceLayer = false,
+}: {
+  color: string;
+  /** Samsung: promote SVG to its own layer so grey fills actually paint. */
+  forceLayer?: boolean;
+}) {
   if (color === "transparent") return null;
   return (
     <svg
@@ -140,11 +149,71 @@ function HexFill({ color }: { color: string }) {
         height: "100%",
         pointerEvents: "none",
         display: "block",
+        transform: forceLayer ? "translateZ(0)" : undefined,
       }}
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
     >
       <polygon points={HEX_SVG_POINTS} fill={color} />
+    </svg>
+  );
+}
+
+/**
+ * One SVG for the whole grey honeycomb (Samsung). Per-cell SVG greys drop out;
+ * clip-path+background darkens colors — this path avoids both.
+ */
+function HexHoneycombFill({
+  cells,
+  emptyKeys,
+  colorForIndex,
+  width,
+  height,
+  hexW,
+  hexH,
+}: {
+  cells: HexCell[];
+  emptyKeys: Record<string, true>;
+  colorForIndex: (index: number) => string;
+  width: number;
+  height: number;
+  hexW: number;
+  hexH: number;
+}) {
+  const unit = HEX_SVG_POINTS.split(/\s+/).map((pair) => {
+    const [x, y] = pair.split(",").map(Number);
+    return { x: x / 100, y: y / 100 };
+  });
+  return (
+    <svg
+      aria-hidden
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width,
+        height,
+        display: "block",
+        pointerEvents: "none",
+        transform: "translateZ(0)",
+      }}
+    >
+      {cells.map((cell) => {
+        const key = `${cell.col}-${cell.row}`;
+        if (key in emptyKeys) return null;
+        const color = colorForIndex(cell.index);
+        if (!color || color === "transparent") return null;
+        const points = unit
+          .map(
+            (p) =>
+              `${cell.left + p.x * hexW},${cell.top + p.y * hexH}`
+          )
+          .join(" ");
+        return <polygon key={cell.index} points={points} fill={"#242424"} />;
+      })}
     </svg>
   );
 }
@@ -425,13 +494,31 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-/** Samsung Internet (esp. Exynos A-series) mishandles body-level fixed stacks + mix-blend. */
+/** Samsung Internet (esp. Exynos A-series) mishandles SVG fills + mix-blend. */
 function isSamsungBrowser() {
-  return typeof navigator !== "undefined" && /SamsungBrowser/i.test(navigator.userAgent);
+  if (typeof navigator === "undefined") return false;
+  // Manual override for debugging: window.__HEX_FORCE_SAMSUNG = true
+  if (typeof window !== "undefined" && window.__HEX_FORCE_SAMSUNG === true) return true;
+  const ua = navigator.userAgent || "";
+  if (/SamsungBrowser/i.test(ua)) return true;
+  // Some Samsung Internet builds omit the token in desktop/UA-spoof modes.
+  const brands = (
+    navigator as Navigator & {
+      userAgentData?: { brands?: Array<{ brand: string }> };
+    }
+  ).userAgentData?.brands;
+  if (brands?.some((b) => /Samsung/i.test(b.brand))) return true;
+  return false;
 }
 
-/** Base grey for scroll hexes. Match backdrop (#363636) — #2B2B2B reads near-black on Samsung OLED. */
+/** Base grey for scroll hexes / backdrop (Chrome and others). */
 const HEX_CELL_GREY = "#363636";
+/** Samsung OLED field behind the honeycomb (must stay above black-crush). */
+const HEX_CELL_GREY_SAMSUNG = "#6a6a6a";
+/** Samsung: lifted map grey (stands in for #2b2b2b / #262626). */
+const HEX_MAP_GREY_SAMSUNG = "#555555";
+/** Samsung alternate map shade (stands in for #262626). */
+const HEX_MAP_GREY_SAMSUNG_ALT = "#4a4a4a";
 
 function parseHexRgb(color: string): [number, number, number] | null {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
@@ -443,6 +530,23 @@ function parseHexRgb(color: string): [number, number, number] | null {
     parseInt(h.slice(2, 4), 16),
     parseInt(h.slice(4, 6), 16),
   ];
+}
+
+/**
+ * Samsung-only: charcoal greys crush to black.
+ * Remap near-black neutrals to stable mid-greys; leave brand colors alone.
+ */
+function samsungSafeFillColor(color: string): string {
+  if (color === "transparent") return color;
+  const rgb = parseHexRgb(color);
+  if (!rgb) return color;
+  const [r, g, b] = rgb;
+  const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+  const luma = (r + g + b) / 3;
+  if (chroma <= 8 && luma > 0 && luma < 55) {
+    return luma < 40 ? HEX_MAP_GREY_SAMSUNG_ALT : HEX_MAP_GREY_SAMSUNG;
+  }
+  return color;
 }
 
 /** Opaque grey→tint mix. Avoids rgba overlays that Samsung composites as dark mud. */
@@ -553,9 +657,19 @@ function activationDirectionalOpacity(
 export default function HexagonsPage() {
   const { width, height } = useViewport();
   const scrollY = useScrollY();
-  // Samsung Internet / Exynos: skip blend + scale; paint fills with SVG (no clip-path fill).
-  const isSamsung = React.useMemo(() => isSamsungBrowser(), []);
+  // Re-check each render so UA / __HEX_FORCE_SAMSUNG overrides apply immediately.
+  const isSamsung = isSamsungBrowser();
   const useLuminosityBlend = !isSamsung;
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.hexSamsung = isSamsung ? "1" : "0";
+    if (isSamsung) {
+      console.info(
+        "[hex] Samsung paint path ON (honeycomb SVG + brand HexFill). Force with window.__HEX_FORCE_SAMSUNG=true"
+      );
+    }
+  }, [isSamsung]);
 
   const isNarrow = width <= CONTENT_MAX_WIDTH;
   // Hex size from the 4-col content band, capped at CONTENT_MAX_WIDTH so wide
@@ -686,7 +800,6 @@ export default function HexagonsPage() {
     "#2b2b2b",
     "#2b2b2b",
     "#262626",
-    "#2b2b2b",
     "#2b2b2b",
     "#2b2b2b",
     "#2b2b2b",
@@ -954,7 +1067,7 @@ export default function HexagonsPage() {
         width: containerWidthPx,
         overflow: "hidden",
         zIndex: 0,
-        background: "#363636",
+        background: isSamsung ? HEX_CELL_GREY_SAMSUNG : HEX_CELL_GREY,
       }}
     >
       {fixedCells.map((cell) => {
@@ -1105,24 +1218,40 @@ export default function HexagonsPage() {
               height: contentHeight + hexHeight,
             }}
           >
-            {scrollingCells.map((cell) => {
-              const key = `${cell.col}-${cell.row}`;
-              if (key in emptyCells) return null;
-              return (
-                <div
-                  key={`bg-${cell.index}`}
-                  style={{
-                    position: "absolute",
-                    left: cell.left,
-                    top: cell.top,
-                    width: hexWidth,
-                    height: hexHeight,
-                  }}
-                >
-                  <HexFill color={HEX_CELL_GREY} />
-                </div>
-              );
-            })}
+            {isSamsung ? (
+              <HexHoneycombFill
+                cells={scrollingCells}
+                emptyKeys={emptyCells}
+                width={containerWidthPx}
+                height={contentHeight + hexHeight}
+                hexW={hexWidth}
+                hexH={hexHeight}
+                colorForIndex={(index) =>
+                  samsungSafeFillColor(
+                    contentCellsGreyMap[index % contentCellsGreyMap.length]
+                  )
+                }
+              />
+            ) : (
+              scrollingCells.map((cell) => {
+                const key = `${cell.col}-${cell.row}`;
+                if (key in emptyCells) return null;
+                return (
+                  <div
+                    key={`bg-${cell.index}`}
+                    style={{
+                      position: "absolute",
+                      left: cell.left,
+                      top: cell.top,
+                      width: hexWidth,
+                      height: hexHeight,
+                    }}
+                  >
+                    <HexFill color={HEX_CELL_GREY} />
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
         <div
@@ -1182,19 +1311,33 @@ export default function HexagonsPage() {
               }
             }
 
-            const cellGrey =
+            const cellGreyRaw =
               contentCellsGreyMap[cell.index % contentCellsGreyMap.length];
+            const cellGrey = isSamsung
+              ? samsungSafeFillColor(cellGreyRaw)
+              : cellGreyRaw;
+            const baseGrey = isSamsung ? HEX_CELL_GREY_SAMSUNG : HEX_CELL_GREY;
             // Brand tint mixes from the mapped hex grey; otherwise the SVG hex
             // fill carries cellGrey (transparent = hole through to fixed backdrop).
             const fillColor = isEmptyCell
               ? "transparent"
               : hasTint
                 ? mixHexColors(
-                    cellGrey === "transparent" ? HEX_CELL_GREY : cellGrey,
+                    cellGrey === "transparent" ? baseGrey : cellGrey,
                     entry!.background!,
                     tintOpacity
                   )
                 : cellGrey;
+
+            const cellTransform = entry
+              ? `scale(${1 + 0.2 * scaleProgress})`
+              : undefined;
+
+            // Samsung: greys come from HexHoneycombFill; only paint brand tints here.
+            // Never use clip-path+background for fills — Samsung darkens them to mud.
+            const showCellFill = isSamsung
+              ? hasTint && fillColor !== "transparent"
+              : fillColor !== "transparent";
 
             return (
               <div
@@ -1206,9 +1349,7 @@ export default function HexagonsPage() {
                   top: cell.top,
                   width: hexWidth,
                   height: hexHeight,
-                  transform: entry
-                    ? `scale(${1 + 0.2 * scaleProgress})`
-                    : undefined,
+                  transform: cellTransform,
                   transformOrigin: "center",
                   // Content cells bump z on activation; progress boost keeps the
                   // more-activated (larger) hex above neighbors it briefly covers.
@@ -1221,8 +1362,9 @@ export default function HexagonsPage() {
                 }}
               >
                 <HexClip />
-                {/* Hex-shaped background (SVG), not the square cell box. */}
-                <HexFill color={fillColor} />
+                {showCellFill ? (
+                  <HexFill color={fillColor} forceLayer={isSamsung} />
+                ) : null}
                 <div
                   className={
                     hasTint && useLuminosityBlend ? "hex-blend-root" : undefined
@@ -1230,7 +1372,6 @@ export default function HexagonsPage() {
                   style={{
                     position: "absolute",
                     inset: 0,
-                    // Keep clip only for content overflow; fill is the SVG above.
                     ...(isSamsung
                       ? {}
                       : { clipPath: HEX_CLIP, WebkitClipPath: HEX_CLIP }),
